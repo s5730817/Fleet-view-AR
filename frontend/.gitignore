@@ -25,3 +25,9 @@ dist-ssr
 node_modules/
 dist/
 dist-ssr/
+
+# Local HTTPS dev certificates
+certs/
+*.key
+*.srl
+ca.crt

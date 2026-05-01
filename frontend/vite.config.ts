@@ -5,6 +5,14 @@ import path from "path";
 
 const certCandidates = [
   {
+    key: path.resolve(__dirname, "./certs/dev.key"),
+    cert: path.resolve(__dirname, "./certs/dev.crt"),
+  },
+  {
+    key: path.resolve(__dirname, "./cert.key"),
+    cert: path.resolve(__dirname, "./cert.crt"),
+  },
+  {
     key: path.resolve(__dirname, "../myAR/certs/localhost-key.pem"),
     cert: path.resolve(__dirname, "../myAR/certs/localhost.pem"),
   },
