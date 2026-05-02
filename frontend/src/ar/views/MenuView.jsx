@@ -1,4 +1,4 @@
-export function MenuView({ markers, onTrack, onDeleteMarker, onExit }) {
+export function MenuView({ markers, onCapture, onTrack, onDeleteMarker, onExit }) {
   return (
     <div className="min-h-screen bg-background text-foreground p-4 sm:p-6">
       <div className="mx-auto max-w-4xl space-y-5">
@@ -9,6 +9,13 @@ export function MenuView({ markers, onTrack, onDeleteMarker, onExit }) {
           </p>
 
           <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={onCapture}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-95"
+            >
+              Capture New Marker
+            </button>
             <button
               type="button"
               onClick={onTrack}

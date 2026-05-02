@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createMarker } from "./markerStorage";
 import { APP_STATES } from "./constants";
 import { useMarkers } from "./hooks/useMarkers";
+import { useMarkerCapture } from "./hooks/useMarkerCapture";
 import { useAREngine } from "./hooks/useAREngine";
 import { useARTracking } from "./hooks/useARTracking";
 import { MenuView } from "./views/MenuView";
+import { CaptureView } from "./views/CaptureView";
 import { TrackingView } from "./views/TrackingView";
 
 /**
@@ -19,15 +21,69 @@ import { TrackingView } from "./views/TrackingView";
  *   showCapturedOnly  - tracking filter toggle
  */
 export default function ARInterface({ onExit }) {
-  // ─── Navigation state ────────────────────────────────────────────────────────
   const [appState, setAppState] = useState(APP_STATES.MENU);
-
+  const [markerName, setMarkerName] = useState("");
+  const [markerDescription, setMarkerDescription] = useState("");
+  const [saveError, setSaveError] = useState(null);
   const [showCapturedOnly, setShowCapturedOnly] = useState(false);
 
-  // ─── Domain hooks ────────────────────────────────────────────────────────────
   const { markers, saveMarkerList } = useMarkers();
+  const captureState = useMarkerCapture();
   const { arReady, arError } = useAREngine();
   const tracking = useARTracking({ appState, arReady, markers, showCapturedOnly });
+
+  useEffect(() => {
+    if (appState !== APP_STATES.CAPTURE || !arReady) {
+      captureState.stopLiveDetection();
+      return undefined;
+    }
+
+    captureState.startLiveDetection(markers);
+    return () => captureState.stopLiveDetection();
+  }, [appState, arReady, markers]);
+
+  const resetCaptureForm = () => {
+    captureState.resetCapture();
+    setMarkerName("");
+    setMarkerDescription("");
+    setSaveError(null);
+  };
+
+  const handleSaveMarker = () => {
+    setSaveError(null);
+    if (!captureState.markerPreviewUrl) {
+      setSaveError("No captured marker image to save.");
+      return;
+    }
+
+    if (!Number.isFinite(captureState.detectedBarcodeValue)) {
+      setSaveError("Unable to save: barcode ID was not detected from the captured marker.");
+      return;
+    }
+
+    if (captureState.barcodeMatchMarker) {
+      setSaveError(
+        `Marker already exists for barcode ID ${captureState.detectedBarcodeValue} (${captureState.barcodeMatchMarker.name}).`,
+      );
+      return;
+    }
+
+    try {
+      const newMarker = createMarker({
+        name: markerName,
+        description: markerDescription,
+        imageUrl: captureState.markerPreviewUrl,
+        barcodeValue: captureState.detectedBarcodeValue,
+      });
+      saveMarkerList([newMarker, ...markers]);
+
+      resetCaptureForm();
+      setAppState(APP_STATES.MENU);
+    } catch (error) {
+      console.error("saveMarker failed", error);
+      setSaveError("Failed to save marker. See console for details.");
+    }
+  };
 
   // ─── Navigation callbacks ────────────────────────────────────────────────────
 
@@ -75,8 +131,40 @@ export default function ARInterface({ onExit }) {
       {appState === APP_STATES.MENU && (
         <MenuView
           markers={markers}
+          onCapture={() => setAppState(APP_STATES.CAPTURE)}
           onTrack={() => setAppState(APP_STATES.TRACKING)}
           onDeleteMarker={handleDeleteMarker}
+          onExit={onExit}
+        />
+      )}
+
+      {appState === APP_STATES.CAPTURE && (
+        <CaptureView
+          arContainerRef={captureState.arContainerRef}
+          videoReady={captureState.liveReady}
+          cameraError={captureState.liveError}
+          canvasRef={captureState.canvasRef}
+          captureError={captureState.captureError}
+          markerPreviewUrl={captureState.markerPreviewUrl}
+          capturedQrData={captureState.capturedQrData}
+          onCapture={() => captureState.captureFrame(markers)}
+          markerName={markerName}
+          setMarkerName={setMarkerName}
+          markerDescription={markerDescription}
+          setMarkerDescription={setMarkerDescription}
+          detectedBarcodeValue={captureState.detectedBarcodeValue}
+          barcodeMatchMarker={captureState.barcodeMatchMarker}
+          barcodeDetectionPending={captureState.barcodeDetectionPending}
+          barcodeDetectionError={captureState.barcodeDetectionError}
+          barcodeDebugInfo={captureState.barcodeDebugInfo}
+          lastDecodeSource={captureState.lastDecodeSource}
+          targetMarker={captureState.targetMarker}
+          saveError={saveError}
+          onSave={handleSaveMarker}
+          onBack={() => {
+            resetCaptureForm();
+            setAppState(APP_STATES.MENU);
+          }}
           onExit={onExit}
         />
       )}
