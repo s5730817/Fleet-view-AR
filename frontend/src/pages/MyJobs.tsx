@@ -186,7 +186,10 @@ export default function MyJobs() {
                     </p>
                   </div>
 
-                  <button className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground">
+                  <button
+                    onClick={() => navigate(`/bus/${bus.id}`)}
+                      className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground"
+                    >
                     View
                   </button>
                 </div>

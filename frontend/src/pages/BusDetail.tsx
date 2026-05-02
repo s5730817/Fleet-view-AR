@@ -10,8 +10,14 @@ import { ARView } from "@/components/ARView";
 import { HistoryModal } from "@/components/HistoryModal";
 import { MaintenanceLogModal } from "@/components/MaintenanceLogModal";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Bus as BusIcon, Gauge, Calendar, MapPin, Eye } from "lucide-react";
-import { AccessibilityToggle } from "@/components/AccessibilityToggle.tsx";
+import {
+  ArrowLeft,
+  Bus as BusIcon,
+  Gauge,
+  Calendar,
+  MapPin,
+  Eye,
+} from "lucide-react";
 
 const BusDetail = () => {
   const { id } = useParams();
@@ -24,7 +30,8 @@ const BusDetail = () => {
   });
 
   const [arOpen, setArOpen] = useState(false);
-  const [historyComponent, setHistoryComponent] = useState<BusComponent | null>(null);
+  const [historyComponent, setHistoryComponent] =
+    useState<BusComponent | null>(null);
   const [logComponent, setLogComponent] = useState<BusComponent | null>(null);
   const [components, setComponents] = useState<BusComponent[]>([]);
 
@@ -45,7 +52,7 @@ const BusDetail = () => {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <p className="text-lg font-bold text-status-urgent">Error loading bus</p>
+        <p className="text-lg font-bold text-red-500">Error loading bus</p>
       </div>
     );
   }
@@ -55,8 +62,14 @@ const BusDetail = () => {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <p className="text-lg font-bold text-foreground">Bus not found</p>
-          <Button variant="outline" onClick={() => navigate("/dashboard")} className="mt-4">
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Fleet
+
+          <Button
+            variant="outline"
+            onClick={() => navigate("/dashboard")}
+            className="mt-4"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Fleet
           </Button>
         </div>
       </div>
@@ -66,19 +79,22 @@ const BusDetail = () => {
   const bus = { ...busData, components };
   const daysUntilService = getDaysUntil(bus.nextServiceDate);
 
-  const handleLogSubmit = async (componentId: string, entry: MaintenanceEntry) => {
+  const handleLogSubmit = async (
+    componentId: string,
+    entry: MaintenanceEntry
+  ) => {
     try {
       const savedEntry = await addMaintenanceEntry(bus.id, componentId, entry);
 
-      setComponents(prev =>
-        prev.map(comp =>
+      setComponents((prev) =>
+        prev.map((comp) =>
           comp.id === componentId
             ? { ...comp, history: [savedEntry, ...comp.history] }
             : comp
         )
       );
 
-      setHistoryComponent(prev =>
+      setHistoryComponent((prev) =>
         prev?.id === componentId
           ? { ...prev, history: [savedEntry, ...prev.history] }
           : prev
@@ -89,89 +105,105 @@ const BusDetail = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card sticky top-0 z-10">
-        <div className="container max-w-6xl flex items-center gap-3 py-4 px-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
+    <main className="container max-w-6xl px-4 py-6 space-y-6">
+      <section className="rounded-2xl border bg-card p-5 shadow-sm">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/dashboard")}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
 
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <BusIcon className="h-5 w-5 text-primary-foreground" />
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <BusIcon className="h-6 w-6" />
+            </div>
+
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">
+                {bus.name}
+              </h1>
+              <p className="text-sm text-muted-foreground font-mono">
+                {bus.plateNumber}
+              </p>
+            </div>
           </div>
 
-          <div>
-            <h1 className="text-lg font-bold text-foreground leading-none">{bus.name}</h1>
-            <p className="text-xs text-muted-foreground font-mono">{bus.plateNumber}</p>
-          </div>
-
-          <div className="ml-auto flex items-center gap-3">
+          <div className="flex items-center gap-3">
             <BusStatusBadge status={bus.status} />
-            <AccessibilityToggle />
+
+            <Button onClick={() => navigate(`/ar?busId=${bus.id}`)}>
+              <Eye className="h-4 w-4 mr-2" />
+              Open AR Mode
+            </Button>
           </div>
         </div>
-      </header>
+      </section>
 
-      <main className="container max-w-6xl px-4 py-6 space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="rounded-lg border bg-card p-3">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1">
-              <Gauge className="h-3.5 w-3.5" />
-              <span className="text-xs">Mileage</span>
-            </div>
-            <p className="text-lg font-bold font-mono text-foreground">
-              {bus.mileage.toLocaleString()}
-            </p>
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="rounded-lg border bg-card p-3">
+          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+            <Gauge className="h-3.5 w-3.5" />
+            <span className="text-xs">Mileage</span>
           </div>
-
-          <div className="rounded-lg border bg-card p-3">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1">
-              <Calendar className="h-3.5 w-3.5" />
-              <span className="text-xs">Last Service</span>
-            </div>
-            <p className="text-lg font-bold font-mono text-foreground">
-              {getDaysAgo(bus.lastServiceDate)}d ago
-            </p>
-          </div>
-
-          <div className="rounded-lg border bg-card p-3">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1">
-              <Calendar className="h-3.5 w-3.5" />
-              <span className="text-xs">Next Service</span>
-            </div>
-            <p className={`text-lg font-bold font-mono ${daysUntilService <= 7 ? "text-status-urgent" : "text-foreground"}`}>
-              {daysUntilService <= 0 ? "Overdue" : `${daysUntilService}d`}
-            </p>
-          </div>
-
-          <div className="rounded-lg border bg-card p-3">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1">
-              <MapPin className="h-3.5 w-3.5" />
-              <span className="text-xs">Model</span>
-            </div>
-            <p className="text-sm font-bold text-foreground">
-              {bus.year} {bus.model}
-            </p>
-          </div>
+          <p className="text-lg font-bold font-mono text-foreground">
+            {bus.mileage.toLocaleString()}
+          </p>
         </div>
 
-        <div>
-          <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">
-            Component Health
-          </h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {components.map(comp => (
-              <ComponentCard
-                key={comp.id}
-                component={comp}
-                onOpenHistory={setHistoryComponent}
-                onLogMaintenance={setLogComponent}
-              />
-            ))}
+        <div className="rounded-lg border bg-card p-3">
+          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+            <Calendar className="h-3.5 w-3.5" />
+            <span className="text-xs">Last Service</span>
           </div>
+          <p className="text-lg font-bold font-mono text-foreground">
+            {getDaysAgo(bus.lastServiceDate)}d ago
+          </p>
         </div>
-      </main>
+
+        <div className="rounded-lg border bg-card p-3">
+          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+            <Calendar className="h-3.5 w-3.5" />
+            <span className="text-xs">Next Service</span>
+          </div>
+          <p
+            className={`text-lg font-bold font-mono ${
+              daysUntilService <= 7 ? "text-red-500" : "text-foreground"
+            }`}
+          >
+            {daysUntilService <= 0 ? "Overdue" : `${daysUntilService}d`}
+          </p>
+        </div>
+
+        <div className="rounded-lg border bg-card p-3">
+          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+            <MapPin className="h-3.5 w-3.5" />
+            <span className="text-xs">Model</span>
+          </div>
+          <p className="text-sm font-bold text-foreground">
+            {bus.year} {bus.model}
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">
+          Component Health
+        </h2>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {components.map((comp) => (
+            <ComponentCard
+              key={comp.id}
+              component={comp}
+              onOpenHistory={setHistoryComponent}
+              onLogMaintenance={setLogComponent}
+            />
+          ))}
+        </div>
+      </section>
 
       <ARView open={arOpen} onClose={() => setArOpen(false)} bus={bus} />
 
@@ -188,7 +220,7 @@ const BusDetail = () => {
         busName={bus.name}
         onLogSubmit={handleLogSubmit}
       />
-    </div>
+    </main>
   );
 };
 

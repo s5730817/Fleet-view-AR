@@ -18,6 +18,7 @@ import MyJobs from "./pages/MyJobs.tsx";
 import Notifications from "./pages/Notifications.tsx";
 import Settings from "./pages/Settings.tsx";
 import Summary from "./pages/Summary.tsx";
+import Team from "./pages/Team.tsx";
 
 
 const queryClient = new QueryClient();
@@ -51,6 +52,7 @@ const AppRoutes = () => {
         <Route path="/maintenance-reports" element={<MaintenanceReports />} />
         <Route path="/ar" element={<ARMode />} />
         <Route path="/jobs" element={<MyJobs />} />
+        <Route path="/team" element={<Team />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<NotFound />} />

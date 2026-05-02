@@ -99,6 +99,10 @@ export function Navbar() {
                 </p>
               </div>
 
+              <DropdownMenuItem onClick={() => navigate("/team")}>
+                Team
+              </DropdownMenuItem>
+
               <DropdownMenuItem onClick={() => navigate("/jobs")}>
                 My Jobs
               </DropdownMenuItem>
