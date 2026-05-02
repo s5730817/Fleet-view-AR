@@ -1,3 +1,6 @@
+import { useQuery } from "@tanstack/react-query";
+import { getSummary } from "@/lib/api";
+
 import { StatCard } from "@/components/StatCard";
 import { DashboardCard } from "@/components/DashboardCard";
 import { CreatedCompletedChart } from "@/components/CompletedChart";
@@ -13,43 +16,38 @@ import {
   MapPinned,
 } from "lucide-react";
 
-const summaryStats = {
-  created: 469,
-  completed: 451,
-  completionRate: "96.1%",
-  overdue: 138,
-};
-
-const createdCompletedData = [
-  { date: "Mon", created: 42, completed: 35 },
-  { date: "Tue", created: 58, completed: 49 },
-  { date: "Wed", created: 74, completed: 68 },
-  { date: "Thu", created: 63, completed: 72 },
-  { date: "Fri", created: 89, completed: 81 },
-  { date: "Sat", created: 54, completed: 61 },
-  { date: "Sun", created: 36, completed: 44 },
-];
-
-const priorityData = [
-  { name: "Low", value: 235 },
-  { name: "Medium", value: 408 },
-  { name: "High", value: 31 },
-  { name: "None", value: 351 },
-];
-
-const onTimeOverdueData = [
-  { name: "On Time", value: 941 },
-  { name: "Overdue", value: 138 },
-];
-
-const jobsByStatusData = [
-  { status: "Open", value: 72 },
-  { status: "In Progress", value: 128 },
-  { status: "Completed", value: 451 },
-  { status: "Overdue", value: 138 },
-];
-
 const Summary = () => {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["summary"],
+    queryFn: getSummary,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-lg font-bold">Loading summary...</p>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-lg font-bold text-red-500">
+          Error loading summary
+        </p>
+      </div>
+    );
+  }
+
+  const {
+    summaryStats,
+    createdCompletedData,
+    priorityData,
+    onTimeOverdueData,
+    jobsByStatusData,
+  } = data;
+
   return (
     <div className="container max-w-6xl p-4 space-y-6">
 

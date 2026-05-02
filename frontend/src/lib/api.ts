@@ -122,3 +122,17 @@ export const getJobs = async () => {
 
   return json.data;
 };
+
+export const getSummary = async () => {
+  const res = await fetch(`${API_URL}/summary`, {
+    headers: getAuthHeaders(),
+  });
+
+  const json = await res.json();
+
+  if (!json.success) {
+    throw new Error(json.error || "Failed to fetch summary");
+  }
+
+  return json.data;
+};
