@@ -136,3 +136,22 @@ export const getSummary = async () => {
 
   return json.data;
 };
+
+// Verify 2FA code
+export const verify2FA = async (email: string, code: string) => {
+  const res = await fetch(`${API_URL}/auth/verify-2fa`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, code }),
+  });
+
+  const json = await res.json();
+
+  if (!json.success) {
+    throw new Error(json.error || "2FA verification failed");
+  }
+
+  return json.data;
+};

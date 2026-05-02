@@ -6,7 +6,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { randomUUID } = require("crypto");
 
-// Temporary in-memory users list with a default admin user
+// Temporary in-memory users list with default users
 let mockUsers = [
   {
     id: "admin-1",
@@ -42,6 +42,10 @@ let mockUsers = [
   }
 ];
 
+// ── 2FA TEMP STORAGE ─────────────────────────────────────────────
+// Stores active 2FA codes until verified or expired
+let pending2FA = [];
+
 // Register a new user
 exports.registerUser = async (userData) => {
   if (!userData) {
@@ -50,30 +54,17 @@ exports.registerUser = async (userData) => {
 
   const { name, email, password, role } = userData;
 
-  if (!name) {
-    throw new Error("Name is required");
-  }
-
-  if (!email) {
-    throw new Error("Email is required");
-  }
-
-  if (!password) {
-    throw new Error("Password is required");
-  }
+  if (!name) throw new Error("Name is required");
+  if (!email) throw new Error("Email is required");
+  if (!password) throw new Error("Password is required");
 
   if (password.length < 6) {
     throw new Error("Password must be at least 6 characters");
   }
 
-  // Check if email already exists
   const existingUser = mockUsers.find((user) => user.email === email);
+  if (existingUser) throw new Error("Email already in use");
 
-  if (existingUser) {
-    throw new Error("Email already in use");
-  }
-
-  // Hash password before storing it
   const password_hash = await bcrypt.hash(password, 10);
 
   const newUser = {
@@ -81,13 +72,12 @@ exports.registerUser = async (userData) => {
     name,
     email,
     password_hash,
-    role: role || "engineer",
+    role: role || "user",
     created_at: new Date().toISOString()
   };
 
   mockUsers.push(newUser);
 
-  // Return safe user data only
   return {
     id: newUser.id,
     name: newUser.name,
@@ -97,35 +87,66 @@ exports.registerUser = async (userData) => {
   };
 };
 
-// Login an existing user
+// Login an existing user (STEP 1: password check → generate 2FA)
 exports.loginUser = async (loginData) => {
-  if (!loginData) {
-    throw new Error("Request body is required");
-  }
+  if (!loginData) throw new Error("Request body is required");
 
   const { email, password } = loginData;
 
-  if (!email) {
-    throw new Error("Email is required");
-  }
+  if (!email) throw new Error("Email is required");
+  if (!password) throw new Error("Password is required");
 
-  if (!password) {
-    throw new Error("Password is required");
-  }
-
-  // Find user by email
   const user = mockUsers.find((user) => user.email === email);
+  if (!user) throw new Error("Invalid email or password");
 
-  if (!user) {
-    throw new Error("Invalid email or password");
-  }
-
-  // Compare password with stored hash
   const passwordMatches = await bcrypt.compare(password, user.password_hash);
+  if (!passwordMatches) throw new Error("Invalid email or password");
 
-  if (!passwordMatches) {
-    throw new Error("Invalid email or password");
+  // ── Generate 2FA code ─────────────────────────────────────────
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+  // TEMP: log instead of sending email
+  console.log(`🔐 2FA code for ${email}: ${code}`);
+
+  // Remove any previous codes for this user
+  pending2FA = pending2FA.filter((entry) => entry.email !== email);
+
+  // Store code with expiry (5 minutes)
+  pending2FA.push({
+    email,
+    code,
+    expiresAt: Date.now() + 5 * 60 * 1000
+  });
+
+  // Tell frontend 2FA is required
+  return {
+    requires2FA: true,
+    email
+  };
+};
+
+// Verify 2FA (STEP 2: issue token)
+exports.verify2FA = async ({ email, code }) => {
+  if (!email) throw new Error("Email is required");
+  if (!code) throw new Error("2FA code is required");
+
+  const entry = pending2FA.find((e) => e.email === email);
+
+  if (!entry) throw new Error("2FA session not found");
+
+  if (Date.now() > entry.expiresAt) {
+    pending2FA = pending2FA.filter((e) => e.email !== email);
+    throw new Error("2FA code expired");
   }
+
+  if (entry.code !== code) {
+    throw new Error("Invalid 2FA code");
+  }
+
+  // Remove used code
+  pending2FA = pending2FA.filter((e) => e.email !== email);
+
+  const user = mockUsers.find((u) => u.email === email);
 
   // Create token
   const token = jwt.sign(

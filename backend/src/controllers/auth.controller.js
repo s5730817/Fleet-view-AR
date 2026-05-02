@@ -41,3 +41,23 @@ exports.loginUser = async (req, res) => {
     });
   }
 };
+
+// Verify 2FA code (second step of login)
+exports.verify2FA = async (req, res) => {
+  try {
+    const result = await authService.verify2FA(req.body);
+
+    res.status(200).json({
+      success: true,
+      message: "2FA verification successful",
+      data: result
+    });
+  } catch (err) {
+    console.error("2FA error:", err);
+
+    res.status(400).json({
+      success: false,
+      error: err.message || "Unknown error"
+    });
+  }
+};
