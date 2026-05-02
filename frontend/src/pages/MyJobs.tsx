@@ -18,9 +18,25 @@ const urgencyRank: Record<string, number> = {
   Low: 1,
 };
 
+const getUrgencyBadgeClass = (urgency: string) => {
+  switch (urgency) {
+    case "Critical":
+    case "High":
+      return "bg-red-500/10 text-red-500 border border-red-500/20";
+    case "Medium":
+      return "bg-yellow-500/10 text-yellow-500 border border-yellow-500/20";
+    case "Low":
+      return "bg-green-500/10 text-green-500 border border-green-500/20";
+    default:
+      return "bg-primary/10 text-primary border border-primary/20";
+  }
+};
+
 export default function MyJobs() {
   const navigate = useNavigate();
-  const [jobSort, setJobSort] = useState<"urgency" | "dueSoonest" | "newest">("urgency");
+  const [jobSort, setJobSort] = useState<"urgency" | "dueSoonest" | "newest">(
+    "urgency"
+  );
 
   const { data: fleet = [], isLoading, error } = useQuery({
     queryKey: ["fleet"],
@@ -38,7 +54,7 @@ export default function MyJobs() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <p className="text-lg font-bold text-status-urgent">Error loading jobs</p>
+        <p className="text-lg font-bold text-red-500">Error loading jobs</p>
       </div>
     );
   }
@@ -49,9 +65,9 @@ export default function MyJobs() {
       ...bus,
       urgency:
         bus.status === "Under Repair"
-          ? "Critical"
-          : bus.status === "Needs Service"
           ? "High"
+          : bus.status === "Needs Service"
+          ? "Medium"
           : "Low",
       dueDate: new Date(Date.now() + (index + 1) * 86400000).toISOString(),
       createdAt: new Date(Date.now() - (index + 1) * 43200000).toISOString(),
@@ -138,38 +154,34 @@ export default function MyJobs() {
                   key={bus.id}
                   className={`flex items-center justify-between rounded-lg border px-4 py-3 ${
                     isOverdue
-                      ? "bg-status-urgent/5 border-status-urgent/40"
+                      ? "bg-red-500/5 border-red-500/40"
                       : "bg-background"
                   }`}
                 >
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="font-semibold text-foreground">{bus.name}</p>
+                      <p className="font-semibold text-foreground">
+                        {bus.name}
+                      </p>
 
                       <span
-                        className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${
-                          bus.urgency === "Critical"
-                            ? "bg-status-urgent/20 text-status-urgent"
-                            : bus.urgency === "High"
-                            ? "bg-status-service/10 text-status-service"
-                            : "bg-primary/10 text-primary"
-                        }`}
+                        className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${getUrgencyBadgeClass(
+                          bus.urgency
+                        )}`}
                       >
-                        {bus.urgency === "Critical" && "⚠️"}
-                        {bus.urgency === "High" && "🛠️"}
-                        {bus.urgency === "Low" && "🔹"}
                         {bus.urgency}
                       </span>
 
                       {isOverdue && (
-                        <span className="text-xs font-medium text-status-urgent">
+                        <span className="text-xs font-medium text-red-500">
                           Overdue
                         </span>
                       )}
                     </div>
 
                     <p className="text-sm text-muted-foreground">
-                      {bus.status} · Due {new Date(bus.dueDate).toLocaleDateString()} · Created{" "}
+                      {bus.status} · Due{" "}
+                      {new Date(bus.dueDate).toLocaleDateString()} · Created{" "}
                       {new Date(bus.createdAt).toLocaleDateString()}
                     </p>
                   </div>
