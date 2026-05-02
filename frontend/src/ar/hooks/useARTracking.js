@@ -44,11 +44,6 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
 
     s.arSource?.domElement?.srcObject?.getTracks().forEach((t) => t.stop());
 
-    if (s.restoreGetUserMedia) {
-      s.restoreGetUserMedia();
-      s.restoreGetUserMedia = null;
-    }
-
     if (s.arSource?.domElement?.parentNode) {
       s.arSource.domElement.parentNode.removeChild(s.arSource.domElement);
     }
@@ -77,37 +72,6 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
     const initScene = () => {
       clearARScene();
 
-      // AR.js in this bundle uses legacy getUserMedia and ignores facingMode.
-      // Patch it to prefer modern constraints and the rear 4:3 camera stream.
-      let restoreGetUserMedia = null;
-      if (navigator?.mediaDevices?.getUserMedia && typeof navigator.getUserMedia === "function") {
-        const originalGetUserMedia = navigator.getUserMedia.bind(navigator);
-        navigator.getUserMedia = (constraints, onSuccess, onError) => {
-          const requestedVideo =
-            typeof constraints?.video === "object" && constraints.video !== null ? constraints.video : {};
-
-          navigator.mediaDevices
-            .getUserMedia({
-              audio: false,
-              video: {
-                ...requestedVideo,
-                facingMode: { ideal: "environment" },
-                width: { ideal: 1280 },
-                height: { ideal: 960 },
-                aspectRatio: { ideal: 4 / 3 },
-              },
-            })
-            .then(onSuccess)
-            .catch((err) => {
-              originalGetUserMedia(constraints, onSuccess, onError || (() => {}));
-            });
-        };
-
-        restoreGetUserMedia = () => {
-          navigator.getUserMedia = originalGetUserMedia;
-        };
-      }
-
       const scene = new THREE.Scene();
       const camera = new THREE.Camera();
       scene.add(camera);
@@ -126,7 +90,7 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
       const arSource = new window.THREEx.ArToolkitSource({
         sourceType: "webcam",
         sourceWidth: 1280,
-        sourceHeight: 960,
+        sourceHeight: 720,
         displayWidth: width,
         displayHeight: height,
       });
@@ -134,6 +98,8 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
       const onResize = () => {
         if (!arSource || !renderer) return;
         arSource.onResizeElement();
+        arSource.domElement.style.marginLeft = "0px";
+        arSource.domElement.style.marginTop = "0px";
         arSource.copyElementSizeTo(renderer.domElement);
         if (arStateRef.current.arContext?.arController) {
           arSource.copyElementSizeTo(arStateRef.current.arContext.arController.canvas);
@@ -159,17 +125,8 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
           width: "100%",
           height: "100%",
           objectFit: "fill",
-          maxWidth: "none",
-          maxHeight: "none",
-          margin: "0",
           zIndex: "0",
           display: "block",
-        });
-
-        Object.assign(renderer.domElement.style, {
-          maxWidth: "none",
-          maxHeight: "none",
-          margin: "0",
         });
 
         arSource.domElement.muted = true;
@@ -178,17 +135,6 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
         container.appendChild(arSource.domElement);
         container.appendChild(renderer.domElement);
         onResize();
-
-        // Prefer the normal rear camera and avoid ultrawide defaults when available.
-        const track = arSource.domElement?.srcObject?.getVideoTracks?.()[0];
-        track
-          ?.applyConstraints({
-            facingMode: "environment",
-            width: { ideal: 1280 },
-            height: { ideal: 960 },
-            aspectRatio: { ideal: 4 / 3 },
-          })
-          .catch(() => {});
 
         arSource.domElement.play?.().catch(() => {});
       });
@@ -205,7 +151,6 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
         arSource,
         arContext,
         resizeListener: onResize,
-        restoreGetUserMedia,
       });
 
       const drawRoundedRect = (ctx, x, y, w, h, r) => {
