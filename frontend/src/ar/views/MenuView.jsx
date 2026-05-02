@@ -1,28 +1,20 @@
-export function MenuView({ markers, onCapture, onTrack, onDeleteMarker, onExit }) {
+export function MenuView({ markers, onTrack, onDeleteMarker, onExit }) {
   return (
     <div className="min-h-screen bg-background text-foreground p-4 sm:p-6">
       <div className="mx-auto max-w-4xl space-y-5">
         <div className="rounded-xl border bg-card p-5 shadow-sm">
           <h1 className="text-2xl font-bold">AR Marker Workspace</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Capture a physical marker and track it live. Marker data stays local in the browser for now.
+            Track physical markers live and assign names to detected IDs. Marker data stays local in the browser.
           </p>
 
           <div className="mt-4 flex flex-wrap gap-3">
             <button
               type="button"
-              onClick={onCapture}
+              onClick={onTrack}
               className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-95"
             >
-              Capture Marker
-            </button>
-            <button
-              type="button"
-              onClick={onTrack}
-              disabled={markers.length === 0}
-              className="rounded-md border border-border bg-background px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Track Markers
+              Open AR Tracking
             </button>
             <button
               type="button"
