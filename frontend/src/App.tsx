@@ -17,6 +17,8 @@ import MaintenanceReports from "./pages/MaintenanceReport.tsx";
 import MyJobs from "./pages/MyJobs.tsx";
 import Notifications from "./pages/Notifications.tsx";
 import Settings from "./pages/Settings.tsx";
+import Summary from "./pages/Summary.tsx";
+
 
 const queryClient = new QueryClient();
 
@@ -44,6 +46,7 @@ const AppRoutes = () => {
         <Route path="/" element={<Login />} />
         <Route path="/dashboard" element={<Index />} />
         <Route path="/bus/:id" element={<BusDetail />} />
+        <Route path="/summary" element={<Summary />} />
         <Route path="/tool-tracker" element={<ToolTracker />} />
         <Route path="/maintenance-reports" element={<MaintenanceReports />} />
         <Route path="/ar" element={<ARMode />} />

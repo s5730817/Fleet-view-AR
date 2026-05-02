@@ -55,6 +55,9 @@ export function Navbar() {
           <NavLink to="/dashboard" className={linkClass}>
             Dashboard
           </NavLink>
+          <NavLink to="/summary" className={linkClass}>
+            Summary
+          </NavLink>
           <NavLink to="/ar" className={linkClass}>
             AR Mode
           </NavLink>
