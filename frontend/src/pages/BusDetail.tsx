@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getBusById, addMaintenanceEntry } from "@/lib/api";
 import { getDaysAgo, getDaysUntil } from "@/lib/dateUtils";
@@ -22,7 +22,8 @@ import {
 const BusDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-
+  const location = useLocation();
+  const backPath = location.state?.from || "/dashboard";
   const { data: busData, isLoading, error } = useQuery({
     queryKey: ["bus", id],
     queryFn: () => getBusById(id!),
@@ -112,7 +113,7 @@ const BusDetail = () => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate(backPath)}
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>

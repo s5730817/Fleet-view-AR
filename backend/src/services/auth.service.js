@@ -10,18 +10,34 @@ const { randomUUID } = require("crypto");
 let mockUsers = [
   {
     id: "admin-1",
-    name: "admin",
+    name: "Admin",
     email: "admin@test.com",
-    password_hash: bcrypt.hashSync("password123", 10), // default password
+    password_hash: bcrypt.hashSync("password123", 10),
     role: "admin",
     created_at: new Date().toISOString()
   },
   {
-    id: "inspector-1",
-    name: "inspector",
-    email: "inspector@test.com",
+    id: "manager-1",
+    name: "Manager",
+    email: "manager@test.com",
     password_hash: bcrypt.hashSync("password123", 10),
-    role: "inspector",
+    role: "manager",
+    created_at: new Date().toISOString()
+  },
+  {
+    id: "tech-1",
+    name: "Tech 1",
+    email: "tech1@test.com",
+    password_hash: bcrypt.hashSync("password123", 10),
+    role: "user",
+    created_at: new Date().toISOString()
+  },
+  {
+    id: "tech-2",
+    name: "Tech 2",
+    email: "tech2@test.com",
+    password_hash: bcrypt.hashSync("password123", 10),
+    role: "user",
     created_at: new Date().toISOString()
   }
 ];

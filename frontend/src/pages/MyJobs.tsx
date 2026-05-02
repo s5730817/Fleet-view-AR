@@ -147,14 +147,16 @@ export default function MyJobs() {
                       : "bg-background"
                   }`}
                 >
-                  <div>
-                    <div className="flex items-center gap-2">
+                  {/* LEFT */}
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Combined Title */}
                       <p className="font-semibold text-foreground">
-                        {job.title}
+                        {job.busName} — {job.title}
                       </p>
 
                       <span
-                        className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${getUrgencyBadgeClass(
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${getUrgencyBadgeClass(
                           job.urgency
                         )}`}
                       >
@@ -169,22 +171,26 @@ export default function MyJobs() {
                     </div>
 
                     <p className="text-sm text-muted-foreground">
-                      {job.busName} · {job.componentName} · {job.status} · Due{" "}
-                      {new Date(job.dueDate).toLocaleDateString()} · Created{" "}
-                      {new Date(job.createdAt).toLocaleDateString()}
+                      Assigned to:{" "}
+                      <span className="font-medium text-foreground">
+                        {job.assignedToName || "You"}
+                      </span>
                     </p>
 
-                    {/* Manager/Admin visibility */}
-                    {job.assignedToName && (
-                      <p className="text-xs text-muted-foreground">
-                        Assigned to: {job.assignedToName}
-                      </p>
-                    )}
+                    <p className="text-sm text-muted-foreground">
+                      Due:{" "}
+                      <span className="font-medium text-foreground">
+                        {new Date(job.dueDate).toLocaleDateString()}
+                      </span>
+                    </p>
                   </div>
 
+                  {/* RIGHT */}
                   <button
-                    onClick={() => navigate(`/bus/${job.busId}`)}
-                    className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground"
+                    onClick={() => navigate(`/bus/${job.busId}`, {
+                      state: { from: "/jobs" },
+                    })}
+                    className="shrink-0 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground"
                   >
                     View
                   </button>
