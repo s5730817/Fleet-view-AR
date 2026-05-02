@@ -25,7 +25,7 @@ export const getFleet = async () => {
   if (!json.success) {
     throw new Error("Failed to fetch fleet");
   }
-console.log("Token being sent:", getToken());
+
   return json.data;
 };
 
@@ -38,6 +38,20 @@ export const getBusById = async (id: string) => {
 
   if (!json.success) {
     throw new Error("Failed to fetch bus");
+  }
+
+  return json.data;
+};
+
+export const getBusARContext = async (id: string) => {
+  const res = await fetch(`${API_URL}/fleet/${id}/ar-context`, {
+    headers: getAuthHeaders(),
+  });
+
+  const json = await res.json();
+
+  if (!json.success) {
+    throw new Error(json.error || "Failed to fetch AR context");
   }
 
   return json.data;
@@ -151,6 +165,74 @@ export const verify2FA = async (email: string, code: string) => {
 
   if (!json.success) {
     throw new Error(json.error || "2FA verification failed");
+  }
+
+  return json.data;
+};
+
+export const createFault = async ({
+  title,
+  description,
+  priority,
+  bus_part_id,
+  issue_type_id,
+  created_by,
+  assigned_user_id,
+  source,
+}: {
+  title: string;
+  description: string;
+  priority: "low" | "medium" | "high";
+  bus_part_id?: string;
+  issue_type_id?: string;
+  created_by?: string;
+  assigned_user_id?: string;
+  source?: string;
+}) => {
+  const res = await fetch(`${API_URL}/faults`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      title,
+      description,
+      priority,
+      bus_part_id,
+      issue_type_id,
+      created_by,
+      assigned_user_id,
+      source,
+    }),
+  });
+
+  const json = await res.json();
+
+  if (!json.success) {
+    throw new Error(json.error || "Failed to create issue");
+  }
+
+  return json.data;
+};
+
+export const addFaultUpdate = async (
+  issueId: string,
+  update: {
+    created_by?: string | null;
+    update_type: "comment" | "status_change" | "sign_off";
+    description: string;
+    status_from?: string | null;
+    status_to?: string | null;
+  }
+) => {
+  const res = await fetch(`${API_URL}/faults/${issueId}/updates`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(update),
+  });
+
+  const json = await res.json();
+
+  if (!json.success) {
+    throw new Error(json.error || "Failed to add issue update");
   }
 
   return json.data;

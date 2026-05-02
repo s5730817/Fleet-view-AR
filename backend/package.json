@@ -5,6 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "nodemon src/server.js",
+    "seed:postgres": "node scripts/seed-postgres.js",
     "start": "node src/server.js",
     "test": "jest"
   },
@@ -20,10 +21,12 @@
     "express-validator": "^7.3.2",
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.1",
-    "mysql2": "^3.22.0",
+    "pg": "^8.16.3",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "jest": "^30.3.0",
+    "nodemon": "^3.1.14",
+    "supertest": "^7.2.2"
   }
 }

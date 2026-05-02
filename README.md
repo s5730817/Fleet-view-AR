@@ -1,104 +1,229 @@
-# Fleet-view-AR
+# Fleet View AR
 
-Fleet View AR is maintained as a single repository that contains both frontend and backend code.
+Fleet View AR is a two-part app:
 
-This repo intentionally does not use Git submodules. The original upstream projects are treated as read-only sources, and updates are imported into this repo through a repeatable sync script.
+- `frontend/`: React + Vite client
+- `backend/`: Express API
 
-## Upstream Credits
+AR is launched from a bus detail page and is scoped to the selected bus.
 
-- Original backend code source: https://github.com/Dom056/Tech-Innovations-Backend-Code
-- Original frontend code source: https://github.com/SophisticatedOC/FrontEndCodeRelease
-
-All credit for the base implementations belongs to the original creators. This repository contains integration work, fixes, and project-specific modifications.
-
-## Project Structure
-
-- `frontend/` - React + Vite client
-- `backend/` - Node + Express API
-- `scripts/sync-upstream.sh` - Pulls snapshots from upstream repos
-
-## Local Setup
-
-### Prerequisites
+## Requirements
 
 - Node.js 20+
 - npm 10+
-- git
-- bash
-- rsync
+- PostgreSQL 14+ if you want live database-backed data
+- OpenSSL if you want HTTPS for phone/camera testing
 
-### Install and run backend
+## Install
 
 ```bash
 cd backend
 npm install
-npm run devStart
+
+cd ../frontend
+npm install
 ```
 
-### Install and run frontend
+## Run In Mock Mode
+
+Use this if you want to start the app without PostgreSQL.
+
+1. Create the backend env file:
 
 ```bash
-cd frontend
-npm install
+cd backend
+cp .env.example .env
+```
+
+2. Set at least this value in `backend/.env`:
+
+```dotenv
+JWT_SECRET=replace_me
+DATA_SOURCE=mock
+```
+
+3. Start the backend:
+
+```bash
+cd backend
 npm run dev
 ```
 
-For HTTPS frontend development instructions, see `frontend/README.md`.
-
-## Upstream Sync Workflow
-
-Use the sync script whenever you want to import newer code from one or both original repos.
-
-### 1) Sync backend from upstream
+4. Start the frontend in a second terminal:
 
 ```bash
-bash scripts/sync-upstream.sh \
-	--backend-url https://github.com/Dom056/Tech-Innovations-Backend-Code.git
+cd frontend
+npm run dev
 ```
 
-Sync is non-destructive by default (local files missing upstream are kept).
-Use `--delete-missing` only if you want strict mirror behavior.
-To preview changes without writing files, add `--dry-run`.
+5. Open the Vite URL shown in the frontend terminal.
 
-Example dry run for both repos:
+## Run With PostgreSQL
+
+Use this if you want live buses, issues, tools, assignments, and AR history stored in the database.
+
+1. Create the local database and user:
 
 ```bash
-bash scripts/sync-upstream.sh \
-	--backend-url https://github.com/Dom056/Tech-Innovations-Backend-Code.git \
-	--frontend-url https://github.com/SophisticatedOC/FrontEndCodeRelease.git \
-	--frontend-subdir website/website \
-	--dry-run
+sudo -u postgres psql
 ```
 
-### 2) Sync frontend from upstream (nested project path supported)
+Inside `psql`:
 
-The frontend upstream repo currently uses nested folders, and the real app path is `website/website`.
+```sql
+CREATE ROLE admin WITH LOGIN PASSWORD 'admin-pgr-db77';
+CREATE DATABASE fleetar OWNER admin;
+\q
+```
+
+2. Create the backend env file:
 
 ```bash
-bash scripts/sync-upstream.sh \
-	--frontend-url https://github.com/SophisticatedOC/FrontEndCodeRelease.git \
-	--frontend-subdir website/website
+cd backend
+cp .env.example .env
 ```
 
-If their structure changes later and the project moves to repo root, you can omit `--frontend-subdir`.
+3. Set these values in `backend/.env`:
 
-### 3) Review and merge
-
-After sync:
-
-- Review `git status` and `git diff`.
-- Resolve conflicts with your local changes.
-- Run tests/build for frontend and backend.
-- Commit with a message that includes the upstream repo and commit hash.
-
-Example commit message:
-
-```text
-sync(frontend): import upstream FrontEndCodeRelease at <commit>
+```dotenv
+PORT=5000
+JWT_SECRET=replace_me
+DATA_SOURCE=postgres
+PGHOST=localhost
+PGPORT=5432
+PGDATABASE=fleetar
+PGUSER=admin
+PGPASSWORD=admin-pgr-db77
 ```
 
-## Notes and Safety
+4. Apply the schema from the repo root:
 
-- Never commit private keys or machine-local cert material.
-- Upstream sync is copy-based, so your Git history remains clean in this repo.
-- If a sync introduces breaking changes, revert that sync commit and retry with a smaller/manual merge.
+```bash
+PGPASSWORD=admin-pgr-db77 psql -h localhost -U admin -d fleetar -f database/db_pstgr.sql
+```
+
+5. Seed the demo data:
+
+```bash
+cd backend
+npm run seed:postgres
+```
+
+6. Start the backend:
+
+```bash
+cd backend
+npm run dev
+```
+
+7. Start the frontend in a second terminal:
+
+```bash
+cd frontend
+npm run dev
+```
+
+## HTTPS For AR Testing
+
+If you are testing AR on a phone or need camera access over HTTPS, use the HTTPS frontend mode.
+
+1. Create a local CA once per machine in `frontend/`:
+
+```bash
+cd frontend
+openssl genrsa -out ca.key 2048
+openssl req -x509 -new -nodes -key ca.key -sha256 -days 3650 -out ca.crt -subj "/CN=Fleet View AR Dev CA"
+```
+
+2. Generate the dev server certificate:
+
+```bash
+cd frontend
+npm run cert:dev
+```
+
+If you need LAN access, include your machine IP:
+
+```bash
+cd frontend
+DEV_CERT_HOSTS=localhost,127.0.0.1,::1,192.168.0.109 npm run cert:dev
+```
+
+3. Trust `frontend/ca.crt` on the device you are testing with.
+
+4. Start the frontend over HTTPS:
+
+```bash
+cd frontend
+npm run dev:https
+```
+
+## Demo Login Accounts
+
+These accounts work in both mock mode and seeded PostgreSQL mode:
+
+- `admin@test.com` / `password123`
+- `manager@test.com` / `password123`
+- `tech1@test.com` / `password123`
+- `tech2@test.com` / `password123`
+
+## How To Use The App
+
+1. Log in.
+2. Open a bus from the fleet view.
+3. Use the bus overview to inspect part status and history.
+4. Launch AR from the bus detail page.
+5. In manager mode, point at a bus-part marker and use `Report Issue`.
+6. In mechanic mode, point at the same part to see the linked issue, guide, and required tools.
+
+Any issue logged or updated in AR is reflected in the part history on the bus overview screen.
+
+## Marker Ranges Used In Demo
+
+- Bus-part markers use the shared `20-39` range on every bus
+- Tool markers use the shared `500-520` range in every depot
+- The `40-499` block is intentionally left empty as growth space so bus parts and tools do not intersect
+
+### Bus part marker layout
+
+Every bus reuses the same part marker IDs.
+
+The unique identifier is:
+
+- `bus license plate + marker id`
+
+Current shared part markers:
+
+- `20` Engine
+- `21` Brakes
+- `22` Tires
+- `23` Battery
+- `24` Suspension
+- `25` Cooling System
+- `26` Transmission
+- `27` Electrical Systems
+
+Formula:
+
+`markerId = 20 + partIndex`
+
+Examples:
+
+- `BUS-4521 + 20` means Engine on Bus 1
+- `BUS-4522 + 20` also means Engine, but on Bus 2
+- `BUS-4521 + 25` means Cooling System on Bus 1
+- `BUS-4538 + 27` means Electrical Systems on Bus 18
+
+This keeps the physical marker set reusable across the fleet instead of consuming a new global marker block for every bus.
+
+Current tool markers in each depot:
+
+1. `500` Diagnostic Scanner
+2. `501` Torque Wrench
+3. `502` Wrench
+4. `503` Drill
+5. `504` Brake Caliper Tool
+6. `505` Hydraulic Jack
+7. `506` Battery Tester
+8. `507` Coolant Pressure Tester
+9. `508` Multimeter

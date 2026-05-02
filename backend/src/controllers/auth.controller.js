@@ -1,6 +1,6 @@
 // This file handles HTTP requests and responses for auth routes.
 
-const authService = require("../services/auth.service");
+const { authService } = require("../services");
 
 // Register a new user
 exports.registerUser = async (req, res) => {

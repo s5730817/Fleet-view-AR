@@ -1,6 +1,6 @@
 // This file handles HTTP requests and responses for summary routes.
 
-const summaryService = require("../services/summary.service");
+const { summaryService } = require("../services");
 
 // GET summary dashboard data
 exports.getSummary = async (req, res) => {

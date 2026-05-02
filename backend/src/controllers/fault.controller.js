@@ -1,6 +1,6 @@
 // This file handles HTTP requests and responses for fault routes.
 
-const faultService = require("../services/fault.service");
+const { faultService } = require("../services");
 
 // GET dashboard summary for faults
 exports.getFaultSummary = async (req, res) => {

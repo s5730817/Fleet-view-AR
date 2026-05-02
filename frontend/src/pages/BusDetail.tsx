@@ -135,7 +135,7 @@ const BusDetail = () => {
           <div className="flex items-center gap-3">
             <BusStatusBadge status={bus.status} />
 
-            <Button onClick={() => navigate(`/ar?busId=${bus.id}`)}>
+            <Button onClick={() => navigate(`/ar?busId=${bus.id}`, { state: { from: `/bus/${bus.id}` } })}>
               <Eye className="h-4 w-4 mr-2" />
               Open AR Mode
             </Button>

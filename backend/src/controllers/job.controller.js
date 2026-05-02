@@ -1,6 +1,6 @@
 // This file handles HTTP requests and responses for job routes.
 
-const jobService = require("../services/job.service");
+const { jobService } = require("../services");
 
 // GET jobs for the logged-in user
 exports.getJobs = async (req, res) => {

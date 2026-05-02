@@ -54,6 +54,31 @@ describe("Auth API", () => {
 
 describe("Fault API", () => {
   let createdFaultId;
+  let busId;
+  let authToken;
+
+  beforeAll(async () => {
+    const email = `fleet-ar-${Date.now()}@example.com`;
+    const password = "secret123";
+
+    await request(app)
+      .post("/api/auth/register")
+      .send({
+        name: "Fleet Tester",
+        email,
+        password,
+        role: "manager"
+      });
+
+    const loginRes = await request(app)
+      .post("/api/auth/login")
+      .send({
+        email,
+        password
+      });
+
+    authToken = loginRes.body.data.token;
+  });
 
   test("GET /api/faults/summary should return summary data", async () => {
     const res = await request(app).get("/api/faults/summary");
@@ -73,6 +98,34 @@ describe("Fault API", () => {
     expect(res.body.success).toBe(true);
     expect(Array.isArray(res.body.data)).toBe(true);
     expect(res.body.count).toBeGreaterThan(0);
+  });
+
+  test("GET /api/fleet should return fleet data", async () => {
+    const res = await request(app)
+      .get("/api/fleet")
+      .set("Authorization", `Bearer ${authToken}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.data.length).toBeGreaterThan(0);
+
+    busId = res.body.data[0].id;
+  });
+
+  test("GET /api/fleet/:id/ar-context should return bus-scoped AR data", async () => {
+    const res = await request(app)
+      .get(`/api/fleet/${busId}/ar-context`)
+      .set("Authorization", `Bearer ${authToken}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.bus.id).toBe(busId);
+    expect(Array.isArray(res.body.data.parts)).toBe(true);
+    expect(res.body.data.parts.length).toBeGreaterThan(0);
+    expect(Array.isArray(res.body.data.tools)).toBe(true);
+    expect(res.body.data.parts[0].markerCode).toBeDefined();
+    expect(Array.isArray(res.body.data.parts[0].issueTypeOptions)).toBe(true);
   });
 
   test("GET /api/faults?status=reported should filter faults by status", async () => {
@@ -116,13 +169,16 @@ describe("Fault API", () => {
       .send({
         title: "Loose overhead cable",
         description: "Cable appears detached near tunnel entrance.",
-        priority: "high"
+        priority: "high",
+        bus_part_id: "engine",
+        source: "ar_issue:oil-leak"
       });
 
     expect(res.statusCode).toBe(201);
     expect(res.body.success).toBe(true);
     expect(res.body.data.title).toBe("Loose overhead cable");
     expect(res.body.data.priority).toBe("high");
+    expect(res.body.data.source).toBe("ar_issue:oil-leak");
 
     createdFaultId = res.body.data.id;
   });
@@ -131,12 +187,12 @@ describe("Fault API", () => {
     const res = await request(app)
       .patch(`/api/faults/${createdFaultId}/status`)
       .send({
-        status: "resolved"
+        status: "awaiting_approval"
       });
 
     expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.data.status).toBe("resolved");
+    expect(res.body.data.status).toBe("awaiting_approval");
   });
 
   test("GET /api/faults/:id/updates should return updates for a fault", async () => {
@@ -159,5 +215,22 @@ describe("Fault API", () => {
     expect(res.statusCode).toBe(201);
     expect(res.body.success).toBe(true);
     expect(res.body.data.update_type).toBe("comment");
+  });
+
+  test("POST /api/faults/:id/updates should capture sign-off notes and status change", async () => {
+    const res = await request(app)
+      .post(`/api/faults/${createdFaultId}/updates`)
+      .send({
+        created_by: "engineer_4",
+        update_type: "sign_off",
+        description: "Repair guide completed and signed off for supervisor review.",
+        status_from: "in_progress",
+        status_to: "awaiting_approval"
+      });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.update_type).toBe("sign_off");
+    expect(res.body.data.status_to).toBe("awaiting_approval");
   });
 });

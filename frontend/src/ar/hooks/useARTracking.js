@@ -356,6 +356,8 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
             id,
             assigned,
             name: matchedMarker?.name || null,
+            description: matchedMarker?.description || "",
+            issuePoints: Array.isArray(matchedMarker?.issuePoints) ? matchedMarker.issuePoints : [],
           });
         }
 

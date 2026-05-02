@@ -1,6 +1,6 @@
 // This file handles HTTP requests and responses for fleet routes.
 
-const fleetService = require("../services/fleet.service");
+const { fleetService } = require("../services");
 
 // GET all buses
 exports.getAllBuses = async (req, res) => {
@@ -39,6 +39,31 @@ exports.getBusById = async (req, res) => {
     });
   } catch (err) {
     console.error("Error fetching bus:", err);
+    res.status(500).json({
+      success: false,
+      error: "Database error"
+    });
+  }
+};
+
+// GET bus-scoped AR context
+exports.getBusARContext = async (req, res) => {
+  try {
+    const arContext = await fleetService.getARContext(req.params.id);
+
+    if (!arContext) {
+      return res.status(404).json({
+        success: false,
+        error: "Bus not found"
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: arContext
+    });
+  } catch (err) {
+    console.error("Error fetching AR context:", err);
     res.status(500).json({
       success: false,
       error: "Database error"

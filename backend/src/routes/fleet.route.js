@@ -15,6 +15,9 @@ router.get("/", fleetController.getAllBuses);
 // Accessible to any authenticated user
 router.get("/:id", fleetController.getBusById);
 
+// GET bus-specific AR context
+router.get("/:id/ar-context", fleetController.getBusARContext);
+
 // CREATE a new maintenance entry for a component
 // Restricted to manager/admin roles only
 router.post(
