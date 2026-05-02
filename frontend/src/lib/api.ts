@@ -108,3 +108,17 @@ export const loginUser = async (username: string, password: string) => {
     window.clearTimeout(timeoutId);
   }
 };
+
+export const getJobs = async () => {
+  const res = await fetch(`${API_URL}/jobs`, {
+    headers: getAuthHeaders(),
+  });
+
+  const json = await res.json();
+
+  if (!json.success) {
+    throw new Error(json.error || "Failed to fetch jobs");
+  }
+
+  return json.data;
+};
