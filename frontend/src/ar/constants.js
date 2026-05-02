@@ -1,8 +1,7 @@
 // ─── Application Screen States ───────────────────────────────────────────────
-// The app is a simple state machine that moves between these four named screens.
+// The app is a simple state machine that moves between named screens.
 export const APP_STATES = {
   MENU: "menu",
-  CAPTURE: "capture",
   TRACKING: "tracking",
 };
 

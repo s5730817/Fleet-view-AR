@@ -1,6 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import * as THREE from "three";
-import { APP_STATES, AR_CAMERA_PARAMS, MATRIX_CODE_TYPE, TRACK_SMOOTHING, TRACK_LOSS_THRESHOLD } from "../constants";
+import {
+  APP_STATES,
+  AR_CAMERA_PARAMS,
+  MATRIX_CODE_TYPE,
+  TRACK_LOSS_THRESHOLD,
+  TRACK_SMOOTHING,
+} from "../constants";
 import { lerpVector, slerpQuaternion } from "../arHelpers";
 
 /**
@@ -38,6 +44,11 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
 
     s.arSource?.domElement?.srcObject?.getTracks().forEach((t) => t.stop());
 
+    if (s.restoreGetUserMedia) {
+      s.restoreGetUserMedia();
+      s.restoreGetUserMedia = null;
+    }
+
     if (s.arSource?.domElement?.parentNode) {
       s.arSource.domElement.parentNode.removeChild(s.arSource.domElement);
     }
@@ -66,6 +77,37 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
     const initScene = () => {
       clearARScene();
 
+      // AR.js in this bundle uses legacy getUserMedia and ignores facingMode.
+      // Patch it to prefer modern constraints and the rear 4:3 camera stream.
+      let restoreGetUserMedia = null;
+      if (navigator?.mediaDevices?.getUserMedia && typeof navigator.getUserMedia === "function") {
+        const originalGetUserMedia = navigator.getUserMedia.bind(navigator);
+        navigator.getUserMedia = (constraints, onSuccess, onError) => {
+          const requestedVideo =
+            typeof constraints?.video === "object" && constraints.video !== null ? constraints.video : {};
+
+          navigator.mediaDevices
+            .getUserMedia({
+              audio: false,
+              video: {
+                ...requestedVideo,
+                facingMode: { ideal: "environment" },
+                width: { ideal: 1280 },
+                height: { ideal: 960 },
+                aspectRatio: { ideal: 4 / 3 },
+              },
+            })
+            .then(onSuccess)
+            .catch((err) => {
+              originalGetUserMedia(constraints, onSuccess, onError || (() => {}));
+            });
+        };
+
+        restoreGetUserMedia = () => {
+          navigator.getUserMedia = originalGetUserMedia;
+        };
+      }
+
       const scene = new THREE.Scene();
       const camera = new THREE.Camera();
       scene.add(camera);
@@ -84,7 +126,7 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
       const arSource = new window.THREEx.ArToolkitSource({
         sourceType: "webcam",
         sourceWidth: 1280,
-        sourceHeight: 720,
+        sourceHeight: 960,
         displayWidth: width,
         displayHeight: height,
       });
@@ -117,8 +159,17 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
           width: "100%",
           height: "100%",
           objectFit: "fill",
+          maxWidth: "none",
+          maxHeight: "none",
+          margin: "0",
           zIndex: "0",
           display: "block",
+        });
+
+        Object.assign(renderer.domElement.style, {
+          maxWidth: "none",
+          maxHeight: "none",
+          margin: "0",
         });
 
         arSource.domElement.muted = true;
@@ -127,6 +178,18 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
         container.appendChild(arSource.domElement);
         container.appendChild(renderer.domElement);
         onResize();
+
+        // Prefer the normal rear camera and avoid ultrawide defaults when available.
+        const track = arSource.domElement?.srcObject?.getVideoTracks?.()[0];
+        track
+          ?.applyConstraints({
+            facingMode: "environment",
+            width: { ideal: 1280 },
+            height: { ideal: 960 },
+            aspectRatio: { ideal: 4 / 3 },
+          })
+          .catch(() => {});
+
         arSource.domElement.play?.().catch(() => {});
       });
 
@@ -142,6 +205,7 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
         arSource,
         arContext,
         resizeListener: onResize,
+        restoreGetUserMedia,
       });
 
       const drawRoundedRect = (ctx, x, y, w, h, r) => {
@@ -253,7 +317,6 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
         const markerRoot = new THREE.Group();
         scene.add(markerRoot);
 
-        // eslint-disable-next-line no-new
         new window.THREEx.ArMarkerControls(arContext, markerRoot, {
           type: "barcode",
           barcodeValue: id,

@@ -15,6 +15,14 @@ let mockUsers = [
     password_hash: bcrypt.hashSync("password123", 10), // default password
     role: "admin",
     created_at: new Date().toISOString()
+  },
+  {
+    id: "inspector-1",
+    name: "inspector",
+    email: "inspector@test.com",
+    password_hash: bcrypt.hashSync("password123", 10),
+    role: "inspector",
+    created_at: new Date().toISOString()
   }
 ];
 
