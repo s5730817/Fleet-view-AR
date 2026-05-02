@@ -1,13 +1,17 @@
+import { useNavigate } from "react-router-dom";
 import { BusCard } from "@/components/BusCard";
 import { useQuery } from "@tanstack/react-query";
 import { getFleet } from "@/lib/api";
-import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Bus, Wrench, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { AccessibilityToggle } from "@/components/AccessibilityToggle";
+import { Bus, Wrench, AlertTriangle, CheckCircle2, ChevronDown } from "lucide-react";
+
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 
 const DEPOT_COUNT = 6;
-const AR_ALLOWED_ROLES = ["inspector", "manager", "admin"];
 
 const Index = () => {
   const navigate = useNavigate();
@@ -16,18 +20,6 @@ const Index = () => {
     queryKey: ["fleet"],
     queryFn: getFleet,
   });
-
-  const userRole = (() => {
-    try {
-      const stored = localStorage.getItem("user");
-      if (!stored) return "user";
-      return JSON.parse(stored)?.role || "user";
-    } catch {
-      return "user";
-    }
-  })();
-
-  const canUseAR = AR_ALLOWED_ROLES.includes(userRole);
 
   if (isLoading) {
     return (
@@ -49,14 +41,10 @@ const Index = () => {
   const needsService = fleet.filter(b => b.status === "Needs Service").length;
   const underRepair = fleet.filter(b => b.status === "Under Repair").length;
 
-  const depots = Array.from({ length: DEPOT_COUNT }, (_, index) => {
-    const depotNumber = index + 1;
-
-    return {
-      depotNumber,
-      buses: fleet.filter((_, busIndex) => busIndex % DEPOT_COUNT === index),
-    };
-  });
+  const depots = Array.from({ length: DEPOT_COUNT }, (_, index) => ({
+    depotNumber: index + 1,
+    buses: fleet.filter((_, busIndex) => busIndex % DEPOT_COUNT === index),
+  }));
 
   const stats = [
     { label: "Total Fleet", value: fleet.length, icon: Bus, color: "text-primary bg-primary/10" },
@@ -67,27 +55,41 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card sticky top-0 z-10">
-        <div className="container max-w-6xl flex items-center gap-3 py-4 px-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <Bus className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-foreground leading-none">FleetView</h1>
-            <p className="text-xs text-muted-foreground">Fleet Maintenance Platform</p>
-          </div>
-          <div className="ml-auto">
-            <div className="flex items-center gap-2">
-              {canUseAR && (
-                <Button size="sm" onClick={() => navigate("/ar")}>AR Mode</Button>
-              )}
-              <AccessibilityToggle />
-            </div>
-          </div>
-        </div>
-      </header>
-
       <main className="container max-w-6xl px-4 py-6 space-y-6">
+
+        {/* HEADER */}
+        <div className="flex items-center justify-between">
+
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">
+              Overview
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Fleet-wide overview across all depots.
+            </p>
+          </div>
+
+          {/* DROPDOWN NAVIGATION */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-2 rounded-md border bg-card px-3 py-2 text-sm">
+                Overview
+                <ChevronDown className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => navigate("/dashboard")}>
+                Overview
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/jobs")}>
+                My Jobs
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* STATS */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {stats.map(stat => (
             <div key={stat.label} className="rounded-lg border bg-card p-4 flex items-center gap-3">
@@ -102,6 +104,7 @@ const Index = () => {
           ))}
         </div>
 
+        {/* DEPOTS */}
         <div className="space-y-6">
           <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
             Depots
@@ -134,6 +137,7 @@ const Index = () => {
             </section>
           ))}
         </div>
+
       </main>
     </div>
   );
