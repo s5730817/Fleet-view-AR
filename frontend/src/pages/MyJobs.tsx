@@ -34,9 +34,10 @@ const getUrgencyBadgeClass = (urgency: string) => {
 
 export default function MyJobs() {
   const navigate = useNavigate();
-  const [jobSort, setJobSort] = useState<"urgency" | "dueSoonest" | "newest">(
-    "urgency"
-  );
+
+  const [jobView, setJobView] = useState<
+    "all" | "urgency" | "dueSoonest" | "newest"
+  >("all");
 
   const { data: jobs = [], isLoading, error } = useQuery({
     queryKey: ["jobs"],
@@ -60,15 +61,19 @@ export default function MyJobs() {
   }
 
   const sortedJobs = [...jobs].sort((a, b) => {
-    if (jobSort === "urgency") {
+    if (jobView === "urgency") {
       return urgencyRank[b.urgency] - urgencyRank[a.urgency];
     }
 
-    if (jobSort === "dueSoonest") {
+    if (jobView === "dueSoonest") {
       return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
     }
 
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    if (jobView === "newest") {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    }
+
+    return 0; // "all" keeps backend order
   });
 
   return (
@@ -78,7 +83,7 @@ export default function MyJobs() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">My Jobs</h1>
           <p className="text-sm text-muted-foreground">
-            Assigned maintenance tasks pulled from the backend.
+            View and manage your assigned maintenance tasks.
           </p>
         </div>
 
@@ -109,25 +114,30 @@ export default function MyJobs() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
-                Sort:{" "}
-                {jobSort === "urgency"
+                View:{" "}
+                {jobView === "all"
+                  ? "All Jobs"
+                  : jobView === "urgency"
                   ? "Urgency"
-                  : jobSort === "dueSoonest"
-                  ? "Soonest"
+                  : jobView === "dueSoonest"
+                  ? "Due Soon"
                   : "Newest"}
                 <ChevronDown className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
 
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setJobSort("urgency")}>
+              <DropdownMenuItem onClick={() => setJobView("all")}>
+                All Jobs
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setJobView("urgency")}>
                 Urgency
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setJobSort("dueSoonest")}>
-                Date: Soonest
+              <DropdownMenuItem onClick={() => setJobView("dueSoonest")}>
+                Due Soon
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setJobSort("newest")}>
-                Newly Created
+              <DropdownMenuItem onClick={() => setJobView("newest")}>
+                Newest
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -147,10 +157,8 @@ export default function MyJobs() {
                       : "bg-background"
                   }`}
                 >
-                  {/* LEFT */}
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      {/* Combined Title */}
                       <p className="font-semibold text-foreground">
                         {job.busName} — {job.title}
                       </p>
@@ -185,11 +193,12 @@ export default function MyJobs() {
                     </p>
                   </div>
 
-                  {/* RIGHT */}
                   <button
-                    onClick={() => navigate(`/bus/${job.busId}`, {
-                      state: { from: "/jobs" },
-                    })}
+                    onClick={() =>
+                      navigate(`/bus/${job.busId}`, {
+                        state: { from: "/jobs" },
+                      })
+                    }
                     className="shrink-0 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground"
                   >
                     View

@@ -19,7 +19,7 @@ const Login = () => {
     setLoading(true);
 
     const formData = new FormData(event.currentTarget);
-    const email = formData.get("username") as string;
+    const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
     try {
@@ -77,13 +77,13 @@ const Login = () => {
 
         <form onSubmit={handleLogin} className="space-y-4">
 
-          {/* Username */}
+          {/* Email */}
           <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
+            <Label htmlFor="email">Email</Label>
             <Input
-              id="username"
-              name="username"
-              placeholder="Enter username"
+              id="email"
+              name="email"
+              placeholder="Enter email"
             />
           </div>
 
