@@ -51,6 +51,8 @@ let mockFaultUpdates = [
   }
 ];
 
+let mockIssueAssignments = [];
+
 // Get dashboard summary for faults
 exports.getFaultSummary = async () => {
   return {
@@ -111,7 +113,17 @@ exports.getFaultById = async (id) => {
 };
 
 // Create a new fault
-exports.createFault = async ({ title, description, status, priority }) => {
+exports.createFault = async ({
+  title,
+  description,
+  status,
+  priority,
+  bus_part_id,
+  issue_type_id,
+  source,
+  created_by,
+  assigned_user_id
+}) => {
   if (!title) {
     throw new Error("Title is required");
   }
@@ -129,14 +141,27 @@ exports.createFault = async ({ title, description, status, priority }) => {
 
   const newFault = {
     id: randomUUID(),
+    bus_part_id: bus_part_id || null,
+    issue_type_id: issue_type_id || null,
+    created_by: created_by || null,
     title,
     description: description || null,
     status: finalStatus,
     priority: finalPriority,
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    source: source || null
   };
 
   mockFaults.push(newFault);
+
+  if (assigned_user_id) {
+    mockIssueAssignments.push({
+      id: randomUUID(),
+      issue_id: newFault.id,
+      user_id: assigned_user_id,
+      assigned_at: new Date().toISOString()
+    });
+  }
 
   return newFault;
 };

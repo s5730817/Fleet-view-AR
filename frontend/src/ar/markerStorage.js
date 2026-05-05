@@ -7,6 +7,16 @@
 
 const STORAGE_KEY = "arMarkers";
 
+const normalizeIssuePoint = (issuePoint) => ({
+  id: issuePoint.id || Date.now().toString(),
+  title: issuePoint.title || "Untitled issue",
+  description: issuePoint.description || "",
+  status: issuePoint.status || "reported",
+  priority: issuePoint.priority || "medium",
+  latestComment: issuePoint.latestComment || "",
+  createdAt: issuePoint.createdAt || new Date().toISOString(),
+});
+
 // Fill in missing / legacy fields so callers can rely on a consistent shape.
 const normalizeMarker = (marker) => ({
   id: marker.id || Date.now().toString(),
@@ -14,7 +24,9 @@ const normalizeMarker = (marker) => ({
   description: marker.description || "",
   imageUrl: marker.imageUrl || "",
   barcodeValue: Number.isFinite(marker.barcodeValue) ? marker.barcodeValue : 0,
-  issuePoints: Array.isArray(marker.issuePoints) ? marker.issuePoints : [],
+  issuePoints: Array.isArray(marker.issuePoints)
+    ? marker.issuePoints.map(normalizeIssuePoint)
+    : [],
 });
 
 /** Valid AR.js 3×3 barcode IDs (0–15) available for assignment to a marker. */
@@ -50,11 +62,11 @@ export const saveMarkers = (updatedMarkers) => {
   return updatedMarkers;
 };
 
-export const createMarker = ({ name, description, imageUrl, barcodeValue }) => ({
+export const createMarker = ({ name, description, imageUrl, barcodeValue, issuePoints = [] }) => ({
   id: Date.now().toString(),
   name: name.trim() || `Marker ${Date.now()}`,
   description: description.trim() || "Saved marker",
   imageUrl,
   barcodeValue,
-  issuePoints: [],
+  issuePoints: issuePoints.map(normalizeIssuePoint),
 });

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { getFleet } from "@/lib/api";
+import { getJobs } from "@/lib/api";
 import { ChevronDown } from "lucide-react";
 
 import {
@@ -34,13 +34,14 @@ const getUrgencyBadgeClass = (urgency: string) => {
 
 export default function MyJobs() {
   const navigate = useNavigate();
-  const [jobSort, setJobSort] = useState<"urgency" | "dueSoonest" | "newest">(
-    "urgency"
-  );
 
-  const { data: fleet = [], isLoading, error } = useQuery({
-    queryKey: ["fleet"],
-    queryFn: getFleet,
+  const [jobView, setJobView] = useState<
+    "all" | "urgency" | "dueSoonest" | "newest"
+  >("all");
+
+  const { data: jobs = [], isLoading, error } = useQuery({
+    queryKey: ["jobs"],
+    queryFn: getJobs,
   });
 
   if (isLoading) {
@@ -59,38 +60,30 @@ export default function MyJobs() {
     );
   }
 
-  const jobs = fleet
-    .filter((bus) => bus.status !== "Operational")
-    .map((bus, index) => ({
-      ...bus,
-      urgency:
-        bus.status === "Under Repair"
-          ? "High"
-          : bus.status === "Needs Service"
-          ? "Medium"
-          : "Low",
-      dueDate: new Date(Date.now() + (index + 1) * 86400000).toISOString(),
-      createdAt: new Date(Date.now() - (index + 1) * 43200000).toISOString(),
-    }))
-    .sort((a, b) => {
-      if (jobSort === "urgency") {
-        return urgencyRank[b.urgency] - urgencyRank[a.urgency];
-      }
+  const sortedJobs = [...jobs].sort((a, b) => {
+    if (jobView === "urgency") {
+      return urgencyRank[b.urgency] - urgencyRank[a.urgency];
+    }
 
-      if (jobSort === "dueSoonest") {
-        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-      }
+    if (jobView === "dueSoonest") {
+      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    }
 
+    if (jobView === "newest") {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
+    }
+
+    return 0; // "all" keeps backend order
+  });
 
   return (
     <main className="container max-w-6xl px-4 py-6 space-y-6">
+      {/* HEADER */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">My Jobs</h1>
           <p className="text-sm text-muted-foreground">
-            Assigned maintenance tasks pulled from the current fleet data.
+            View and manage your assigned maintenance tasks.
           </p>
         </div>
 
@@ -113,6 +106,7 @@ export default function MyJobs() {
         </DropdownMenu>
       </div>
 
+      {/* JOBS */}
       <section className="rounded-lg border bg-card p-4 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-foreground">Assigned Jobs</h2>
@@ -120,56 +114,61 @@ export default function MyJobs() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
-                Sort:{" "}
-                {jobSort === "urgency"
+                View:{" "}
+                {jobView === "all"
+                  ? "All Jobs"
+                  : jobView === "urgency"
                   ? "Urgency"
-                  : jobSort === "dueSoonest"
-                  ? "Soonest"
+                  : jobView === "dueSoonest"
+                  ? "Due Soon"
                   : "Newest"}
                 <ChevronDown className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
 
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setJobSort("urgency")}>
+              <DropdownMenuItem onClick={() => setJobView("all")}>
+                All Jobs
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setJobView("urgency")}>
                 Urgency
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setJobSort("dueSoonest")}>
-                Date: Soonest
+              <DropdownMenuItem onClick={() => setJobView("dueSoonest")}>
+                Due Soon
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setJobSort("newest")}>
-                Newly Created
+              <DropdownMenuItem onClick={() => setJobView("newest")}>
+                Newest
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
 
         <div className="space-y-3">
-          {jobs.length > 0 ? (
-            jobs.map((bus) => {
-              const isOverdue = new Date(bus.dueDate) < new Date();
+          {sortedJobs.length > 0 ? (
+            sortedJobs.map((job) => {
+              const isOverdue = new Date(job.dueDate) < new Date();
 
               return (
                 <div
-                  key={bus.id}
+                  key={job.id}
                   className={`flex items-center justify-between rounded-lg border px-4 py-3 ${
                     isOverdue
                       ? "bg-red-500/5 border-red-500/40"
                       : "bg-background"
                   }`}
                 >
-                  <div>
-                    <div className="flex items-center gap-2">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
                       <p className="font-semibold text-foreground">
-                        {bus.name}
+                        {job.busName} — {job.title}
                       </p>
 
                       <span
-                        className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${getUrgencyBadgeClass(
-                          bus.urgency
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${getUrgencyBadgeClass(
+                          job.urgency
                         )}`}
                       >
-                        {bus.urgency}
+                        {job.urgency}
                       </span>
 
                       {isOverdue && (
@@ -180,16 +179,28 @@ export default function MyJobs() {
                     </div>
 
                     <p className="text-sm text-muted-foreground">
-                      {bus.status} · Due{" "}
-                      {new Date(bus.dueDate).toLocaleDateString()} · Created{" "}
-                      {new Date(bus.createdAt).toLocaleDateString()}
+                      Assigned to:{" "}
+                      <span className="font-medium text-foreground">
+                        {job.assignedToName || "You"}
+                      </span>
+                    </p>
+
+                    <p className="text-sm text-muted-foreground">
+                      Due:{" "}
+                      <span className="font-medium text-foreground">
+                        {new Date(job.dueDate).toLocaleDateString()}
+                      </span>
                     </p>
                   </div>
 
                   <button
-                    onClick={() => navigate(`/bus/${bus.id}`)}
-                      className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground"
-                    >
+                    onClick={() =>
+                      navigate(`/bus/${job.busId}`, {
+                        state: { from: "/jobs" },
+                      })
+                    }
+                    className="shrink-0 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground"
+                  >
                     View
                   </button>
                 </div>

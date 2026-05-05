@@ -1,34 +1,5 @@
-# ----- AR Maintenance Backend -----
-This backend API supports an AR-based maintenance system for public transport environments. 
-It handles fault reporting, tool tracking, and secure communication between the frontend 
-and database.
+# Backend Notes
 
-## ----- Tech Stack -----
-- Node.js
-- Express.js
-- Nodemon
-- dotenv
+Backend setup, environment, database, and run instructions were moved to the project root README.
 
-## ----- Installation -----
-
-1. Clone the repository:
-git clone <https://github.com/Dom056/Tech-Innovations-Backend-Code.git>
-
-2. Navigate into the project folder:
-cd backend
-
-3. Install dependencies:
-npm install
-
-## ----- Environment Variables -----
-
-Create a `.env` file in the root directory and add:
-
-PORT=5000
-JWT_SECRET=your_secret_key
-
-## ----- Running the Server -----
-
-Start the development server with nodemon:
-
-npm run devStart
+Use [/README.md](projects/Fleet-view-AR/README.md) as the single source of truth.

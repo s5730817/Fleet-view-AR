@@ -1,6 +1,7 @@
 // This file contains the main fault logic and validation before database queries run.
 
 const { randomUUID } = require("crypto");
+const db = require("../database/db");
 const faultModel = require("../models/fault.model");
 const {
   allowedStatuses,
@@ -37,7 +38,17 @@ exports.getFaultById = async (id) => {
 };
 
 // Create a new fault with defaults and validation
-exports.createFault = async ({ title, description, status, priority }) => {
+exports.createFault = async ({
+  title,
+  description,
+  status,
+  priority,
+  bus_part_id,
+  issue_type_id,
+  source,
+  created_by,
+  assigned_user_id
+}) => {
   if (!title) {
     throw new Error("Title is required");
   }
@@ -54,13 +65,29 @@ exports.createFault = async ({ title, description, status, priority }) => {
   }
 
   const faultId = randomUUID();
+  const assignedAt = new Date().toISOString();
 
-  await faultModel.createFault({
-    id: randomUUID(),
-    title,
-    description: description || null,
-    status: finalStatus,
-    priority: finalPriority
+  await db.withTransaction(async (client) => {
+    await faultModel.createFault({
+      id: faultId,
+      bus_part_id: bus_part_id || null,
+      issue_type_id: issue_type_id || null,
+      created_by: created_by || null,
+      title,
+      description: description || null,
+      status: finalStatus,
+      priority: finalPriority,
+      source: source || null
+    }, client);
+
+    if (assigned_user_id) {
+      await faultModel.createIssueAssignment({
+        id: randomUUID(),
+        issue_id: faultId,
+        user_id: assigned_user_id,
+        assigned_at: assignedAt
+      }, client);
+    }
   });
 
   return await faultModel.getFaultById(faultId);

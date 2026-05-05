@@ -1,36 +1,52 @@
-// This file contains all MySQL queries for faults and fault updates. Will change this if we move to PostgreSQL.
+// This file contains all PostgreSQL queries for faults and fault updates.
 
-const pool = require("../database/db");
+const db = require("../database/db");
 
 // Get summary data for dashboard
 exports.getFaultSummary = async () => {
-  const [rows] = await pool.query(`
+  const result = await db.query(`
     SELECT
-      COUNT(*) AS total,
-      SUM(CASE WHEN status = 'reported' THEN 1 ELSE 0 END) AS reported,
-      SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress,
-      SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) AS resolved,
-      SUM(CASE WHEN priority = 'high' THEN 1 ELSE 0 END) AS high_priority,
-      SUM(CASE WHEN priority = 'medium' THEN 1 ELSE 0 END) AS medium_priority,
-      SUM(CASE WHEN priority = 'low' THEN 1 ELSE 0 END) AS low_priority
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE status = 'reported')::int AS reported,
+      COUNT(*) FILTER (WHERE status = 'in_progress')::int AS in_progress,
+      COUNT(*) FILTER (WHERE status = 'resolved')::int AS resolved,
+      COUNT(*) FILTER (WHERE priority = 'high')::int AS high_priority,
+      COUNT(*) FILTER (WHERE priority = 'medium')::int AS medium_priority,
+      COUNT(*) FILTER (WHERE priority = 'low')::int AS low_priority
     FROM issues
   `);
 
-  return rows[0];
+  return result.rows[0];
 };
 
 // Get all faults with optional filters and sorting
 exports.getAllFaults = async ({ status, priority, sort }) => {
   let query = `
     SELECT
-      id,
-      title,
-      description,
-      status,
-      priority,
-      created_at,
-      updated_at
+      issues.id,
+      issues.bus_part_id,
+      issues.issue_type_id,
+      issues.title,
+      issues.description,
+      issues.status,
+      issues.priority,
+      issues.created_at,
+      issues.source,
+      issues.updated_at,
+      issue_types.code AS issue_type_code,
+      issue_types.label AS issue_type_label,
+      assignee.id AS assigned_to,
+      assignee.name AS assigned_to_name
     FROM issues
+    LEFT JOIN issue_types ON issue_types.id = issues.issue_type_id
+    LEFT JOIN LATERAL (
+      SELECT issue_assignments.user_id
+      FROM issue_assignments
+      WHERE issue_assignments.issue_id = issues.id
+      ORDER BY issue_assignments.assigned_at DESC NULLS LAST, issue_assignments.id DESC
+      LIMIT 1
+    ) AS latest_assignment ON TRUE
+    LEFT JOIN users AS assignee ON assignee.id = latest_assignment.user_id
   `;
 
   const queryParams = [];
@@ -38,12 +54,12 @@ exports.getAllFaults = async ({ status, priority, sort }) => {
 
   // Add filters if they were provided
   if (status) {
-    conditions.push("status = ?");
+    conditions.push(`status = $${queryParams.length + 1}`);
     queryParams.push(status);
   }
 
   if (priority) {
-    conditions.push("priority = ?");
+    conditions.push(`priority = $${queryParams.length + 1}`);
     queryParams.push(priority);
   }
 
@@ -59,43 +75,76 @@ exports.getAllFaults = async ({ status, priority, sort }) => {
     query += " ORDER BY created_at DESC";
   }
 
-  const [rows] = await pool.query(query, queryParams);
-  return rows;
+  const result = await db.query(query, queryParams);
+  return result.rows;
 };
 
 // Get one fault by id
 exports.getFaultById = async (id) => {
-  const [rows] = await pool.query(
-    "SELECT * FROM issues WHERE id = ?",
+  const result = await db.query(
+    `SELECT
+      issues.*,
+      issue_types.code AS issue_type_code,
+      issue_types.label AS issue_type_label,
+      assignee.id AS assigned_to,
+      assignee.name AS assigned_to_name
+     FROM issues
+     LEFT JOIN issue_types ON issue_types.id = issues.issue_type_id
+     LEFT JOIN LATERAL (
+       SELECT issue_assignments.user_id
+       FROM issue_assignments
+       WHERE issue_assignments.issue_id = issues.id
+       ORDER BY issue_assignments.assigned_at DESC NULLS LAST, issue_assignments.id DESC
+       LIMIT 1
+     ) AS latest_assignment ON TRUE
+     LEFT JOIN users AS assignee ON assignee.id = latest_assignment.user_id
+     WHERE issues.id = $1`,
     [id]
   );
 
-  return rows[0] || null;
+  return result.rows[0] || null;
 };
 
 // Create a new fault
-exports.createFault = async ({ id, title, description, status, priority }) => {
-  await pool.query(
+exports.createFault = async ({ id, bus_part_id, issue_type_id, created_by, title, description, status, priority, source }, executor = db) => {
+  await executor.query(
     `INSERT INTO issues (
       id,
+      bus_part_id,
+      issue_type_id,
+      created_by,
       title,
       description,
       status,
       priority,
+      source,
       created_at,
       updated_at
     )
-    VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
-    [id, title, description, status, priority]
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())`,
+    [id, bus_part_id, issue_type_id, created_by, title, description, status, priority, source]
+  );
+};
+
+exports.createIssueAssignment = async ({ id, issue_id, user_id, assigned_at }, executor = db) => {
+  await executor.query(
+    `INSERT INTO issue_assignments (
+      id,
+      issue_id,
+      user_id,
+      assigned_at
+    )
+    VALUES ($1, $2, $3, $4)`,
+    [id, issue_id, user_id, assigned_at]
   );
 };
 
 // Update a fault's status
 exports.updateFaultStatus = async (id, status) => {
-  await pool.query(
+  await db.query(
     `UPDATE issues
-     SET status = ?, updated_at = NOW()
-     WHERE id = ?`,
+     SET status = $1, updated_at = NOW()
+     WHERE id = $2`,
     [status, id]
   );
 };
@@ -111,7 +160,7 @@ exports.createFaultUpdate = async ({
   status_to,
   new_issue_id
 }) => {
-  await pool.query(
+  await db.query(
     `INSERT INTO issue_updates (
       id,
       issue_id,
@@ -123,7 +172,7 @@ exports.createFaultUpdate = async ({
       status_to,
       new_issue_id
     )
-    VALUES (?, ?, NOW(), ?, ?, ?, ?, ?, ?)`,
+    VALUES ($1, $2, NOW(), $3, $4, $5, $6, $7, $8)`,
     [
       id,
       issue_id,
@@ -139,7 +188,7 @@ exports.createFaultUpdate = async ({
 
 // Get all updates for one fault
 exports.getFaultUpdates = async (issueId) => {
-  const [rows] = await pool.query(
+  const result = await db.query(
     `SELECT
       id,
       issue_id,
@@ -151,20 +200,20 @@ exports.getFaultUpdates = async (issueId) => {
       status_to,
       new_issue_id
      FROM issue_updates
-     WHERE issue_id = ?
+     WHERE issue_id = $1
      ORDER BY created_at DESC`,
     [issueId]
   );
 
-  return rows;
+  return result.rows;
 };
 
 // Get one update by id
 exports.getFaultUpdateById = async (updateId) => {
-  const [rows] = await pool.query(
-    "SELECT * FROM issue_updates WHERE id = ?",
+  const result = await db.query(
+    "SELECT * FROM issue_updates WHERE id = $1",
     [updateId]
   );
 
-  return rows[0] || null;
+  return result.rows[0] || null;
 };

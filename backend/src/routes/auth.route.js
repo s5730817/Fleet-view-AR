@@ -10,4 +10,7 @@ router.post("/register", authController.registerUser);
 // Login an existing user
 router.post("/login", authController.loginUser);
 
+// Verify 2FA code
+router.post("/verify-2fa", authController.verify2FA);
+
 module.exports = router;

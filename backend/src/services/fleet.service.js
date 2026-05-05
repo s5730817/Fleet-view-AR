@@ -1,6 +1,80 @@
 // This file contains the main fleet logic using temporary mock data.
 
 const { randomUUID } = require("crypto");
+const faultService = require("./fault.service");
+const {
+  defaultToolNames,
+  getBusMarkerCode,
+  getToolMarkerCode,
+  getIssueTypeOptionsForPart
+} = require("../utils/arIssueCatalog");
+
+const mockAssignableUsersByDepot = {
+  1: [
+    { id: "tech-1", name: "Tech 1", email: "tech1@test.com", role: "engineer" },
+    { id: "manager-1", name: "Manager", email: "manager@test.com", role: "manager" }
+  ],
+  2: [
+    { id: "tech-2", name: "Tech 2", email: "tech2@test.com", role: "engineer" },
+    { id: "admin-1", name: "Admin", email: "admin@test.com", role: "admin" }
+  ]
+};
+
+const mockActorNameMap = {
+  engineer_1: "Tech 1",
+  engineer_2: "Tech 2",
+  engineer_3: "Tech 1",
+  engineer_4: "Tech 2",
+  system_user: "System"
+};
+
+const augmentHistoryWithIssues = async (buses) => {
+  const faults = await faultService.getAllFaults({});
+
+  return Promise.all(
+    buses.map(async (bus) => {
+      const components = await Promise.all(
+        bus.components.map(async (component) => {
+          const faultHistory = faults
+            .filter((fault) => fault.bus_part_id === component.id)
+            .map((fault) => ({
+              id: `issue:${fault.id}`,
+              date: new Date(fault.created_at).toISOString().slice(0, 10),
+              type: "issue",
+              description: `Issue logged: ${fault.title}`,
+              technician: mockActorNameMap[fault.created_by] || "System",
+            }));
+
+          const faultUpdates = (
+            await Promise.all(
+              faults
+                .filter((fault) => fault.bus_part_id === component.id)
+                .map((fault) => faultService.getFaultUpdates(fault.id))
+            )
+          ).flat().filter(Boolean).map((update) => ({
+            id: `update:${update.id}`,
+            date: new Date(update.created_at).toISOString().slice(0, 10),
+            type: update.update_type,
+            description: update.description,
+            technician: mockActorNameMap[update.created_by] || "System",
+          }));
+
+          return {
+            ...component,
+            history: [...component.history, ...faultHistory, ...faultUpdates].sort(
+              (left, right) => new Date(right.date).getTime() - new Date(left.date).getTime()
+            ),
+          };
+        })
+      );
+
+      return {
+        ...bus,
+        components,
+      };
+    })
+  );
+};
 
 // Helper function to create a bus component
 const createComponent = (
@@ -346,12 +420,58 @@ const fleet = [
 
 // GET all buses
 exports.getAllBuses = async () => {
-  return fleet;
+  return augmentHistoryWithIssues(fleet);
 };
 
 // GET one bus by id
 exports.getBusById = async (id) => {
-  return fleet.find((bus) => bus.id === id) || null;
+  const [bus] = await augmentHistoryWithIssues(fleet.filter((entry) => entry.id === id));
+  return bus || null;
+};
+
+exports.getARContext = async (id) => {
+  const busIndex = fleet.findIndex((bus) => bus.id === id);
+  if (busIndex === -1) {
+    return null;
+  }
+
+  const bus = fleet[busIndex];
+  const depotName = busIndex < 9 ? "Central Depot" : "North Depot";
+  const depotSequence = busIndex < 9 ? 1 : 2;
+
+  return {
+    bus: {
+      id: bus.id,
+      name: bus.name,
+      plateNumber: bus.plateNumber,
+      depotId: `mock-depot-${depotSequence}`,
+      depotName,
+      status: bus.status
+    },
+    parts: bus.components.map((component, componentIndex) => ({
+      id: component.id,
+      code: component.id,
+      name: component.name,
+      markerCode: getBusMarkerCode(componentIndex),
+      icon: component.icon,
+      status: component.status,
+      healthPercent: component.healthPercent,
+      arInstructions: component.arInstructions,
+      issueTypeOptions: getIssueTypeOptionsForPart(component.id, component.arInstructions).map((issueType) => ({
+        id: `mock:${component.id}:${issueType.key}`,
+        ...issueType
+      })),
+      activeIssues: []
+    })),
+    assignableUsers: mockAssignableUsersByDepot[depotSequence] || [],
+    tools: defaultToolNames.map((toolName, toolIndex) => ({
+      id: `tool:${depotSequence}:${toolName}`,
+      name: toolName,
+      markerCode: getToolMarkerCode(toolIndex),
+      status: "available",
+      depotName
+    }))
+  };
 };
 
 // CREATE a new maintenance entry for a component

@@ -23,13 +23,21 @@ import Team from "./pages/Team.tsx";
 
 const queryClient = new QueryClient();
 
+const normalizeStoredUserRole = (role: unknown) => {
+  if (role === "admin" || role === "manager") {
+    return role;
+  }
+
+  return "user";
+};
+
 const getStoredUserRole = () => {
   const storedUser = localStorage.getItem("user");
 
   if (!storedUser) return "user";
 
   try {
-    return JSON.parse(storedUser).role || "user";
+    return normalizeStoredUserRole(JSON.parse(storedUser).role);
   } catch {
     return "user";
   }
