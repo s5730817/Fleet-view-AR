@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { User } from "lucide-react";
+import { Menu, User } from "lucide-react";
 
 export function Navbar() {
   const navigate = useNavigate();
@@ -28,30 +28,30 @@ export function Navbar() {
     }`;
 
   return (
-    <header className="border-b bg-card sticky top-0 z-10">
-      <div className="container max-w-6xl flex items-center px-4 py-4">
+    <header className="sticky top-0 z-10 border-b bg-card">
+      <div className="container max-w-6xl flex items-center gap-3 px-4 py-3">
 
-        {/* LEFT: Logo + Branding */}
-        <div className="flex items-center gap-3">
+        {/* LEFT: Logo */}
+        <div className="flex min-w-0 items-center gap-3">
           <img
             src="/transitlens-logo.png"
             alt="TransitLens logo"
-            className="h-12 w-12 rounded-lg object-contain"
+            className="h-10 w-10 shrink-0 rounded-lg object-contain sm:h-12 sm:w-12"
           />
 
-          <div className="leading-tight">
-            <h1 className="text-lg font-bold text-foreground">
+          <div className="min-w-0 leading-tight">
+            <h1 className="truncate text-base font-bold text-foreground sm:text-lg">
               Transit<span className="text-primary">Lens</span>
             </h1>
 
-            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+            <p className="hidden text-[10px] uppercase tracking-widest text-muted-foreground sm:block">
               AR Maintenance System
             </p>
           </div>
         </div>
 
-        {/* CENTER: Navigation */}
-        <nav className="flex items-center gap-2 mx-auto">
+        {/* CENTER: Desktop Navigation */}
+        <nav className="mx-auto hidden items-center gap-2 lg:flex">
           <NavLink to="/dashboard" className={linkClass}>
             Dashboard
           </NavLink>
@@ -69,8 +69,41 @@ export function Navbar() {
           </NavLink>
         </nav>
 
-        {/* RIGHT: Account Menu */}
-        <div className="ml-auto">
+        {/* RIGHT: Mobile Nav + Account */}
+        <div className="ml-auto flex items-center gap-2">
+
+          {/* MOBILE NAV (ONLY NAVBAR LINKS) */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex h-9 w-9 items-center justify-center rounded-full bg-muted hover:bg-muted/80 lg:hidden">
+                <Menu className="h-5 w-5 text-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={() => navigate("/dashboard")}>
+                Dashboard
+              </DropdownMenuItem>
+
+              <DropdownMenuItem onClick={() => navigate("/summary")}>
+                Summary
+              </DropdownMenuItem>
+
+              <DropdownMenuItem onClick={() => navigate("/ar")}>
+                AR Mode
+              </DropdownMenuItem>
+
+              <DropdownMenuItem onClick={() => navigate("/tool-tracker")}>
+                Tool Tracker
+              </DropdownMenuItem>
+
+              <DropdownMenuItem onClick={() => navigate("/maintenance-reports")}>
+                Maintenance Reports
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* ACCOUNT MENU */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex h-9 w-9 items-center justify-center rounded-full bg-muted hover:bg-muted/80">
@@ -79,36 +112,30 @@ export function Navbar() {
             </DropdownMenuTrigger>
 
             <DropdownMenuContent align="end" className="w-56">
-
-              {/* 👤 User Info */}
               <div className="px-3 py-2">
-                <p className="text-sm font-medium text-foreground">
+                <p className="truncate text-sm font-medium text-foreground">
                   {user?.name || "User"}
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="truncate text-xs text-muted-foreground">
                   {user?.role || "Technician"}
                 </p>
               </div>
 
               <DropdownMenuSeparator />
 
-              {/* 📋 Navigation Section */}
+              {/* Navigation (extra pages not in navbar) */}
               <div className="px-3 py-1">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Navigation
                 </p>
               </div>
-
-              <DropdownMenuItem onClick={() => navigate("/team")}>
-                Team
-              </DropdownMenuItem>
 
               <DropdownMenuItem onClick={() => navigate("/jobs")}>
                 My Jobs
               </DropdownMenuItem>
 
-              <DropdownMenuItem onClick={() => navigate("/maintenance-reports")}>
-                Reports
+              <DropdownMenuItem onClick={() => navigate("/team")}>
+                Team
               </DropdownMenuItem>
 
               <DropdownMenuItem onClick={() => navigate("/notifications")}>
@@ -117,9 +144,9 @@ export function Navbar() {
 
               <DropdownMenuSeparator />
 
-              {/* ♿ Accessibility Section */}
+              {/* Accessibility */}
               <div className="px-3 py-1">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Accessibility
                 </p>
               </div>
@@ -130,9 +157,9 @@ export function Navbar() {
 
               <DropdownMenuSeparator />
 
-              {/* ⚙️ Account Section */}
+              {/* Account */}
               <div className="px-3 py-1">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Account
                 </p>
               </div>
@@ -147,11 +174,10 @@ export function Navbar() {
               >
                 Logout
               </DropdownMenuItem>
-
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
 
+        </div>
       </div>
     </header>
   );
