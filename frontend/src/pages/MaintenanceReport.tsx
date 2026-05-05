@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   FileText,
   CheckCircle2,
@@ -5,94 +7,90 @@ import {
   Clock,
   Download,
   Eye,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 
+import { getFleet } from "@/lib/api";
+import type { Bus } from "@/types/fleet";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
-type ReportStatus = "Completed" | "In Progress" | "Fault Found";
+const DEPOT_COUNT = 6;
 
-interface MaintenanceReport {
-  id: number;
-  busName: string;
-  depot: string;
-  task: string;
-  technician: string;
-  date: string;
-  status: ReportStatus;
-}
-
-const reports: MaintenanceReport[] = [
-  {
-    id: 1,
-    busName: "Bus TL-204",
-    depot: "Depot 1",
-    task: "Brake pressure inspection",
-    technician: "Alex Morgan",
-    date: "2026-05-02",
-    status: "Fault Found",
-  },
-  {
-    id: 2,
-    busName: "Bus TL-118",
-    depot: "Depot 3",
-    task: "Battery inspection",
-    technician: "Jamie Carter",
-    date: "2026-05-01",
-    status: "Completed",
-  },
-  {
-    id: 3,
-    busName: "Bus TL-091",
-    depot: "Depot 2",
-    task: "Scheduled service check",
-    technician: "Taylor Singh",
-    date: "2026-04-30",
-    status: "In Progress",
-  },
-  {
-    id: 4,
-    busName: "Bus TL-077",
-    depot: "Depot 6",
-    task: "HVAC inspection",
-    technician: "Morgan Lee",
-    date: "2026-04-29",
-    status: "Completed",
-  },
-];
-
-const getStatusStyle = (status: ReportStatus) => {
+const getStatusStyle = (status: Bus["status"]) => {
   switch (status) {
-    case "Completed":
+    case "Operational":
       return {
         icon: <CheckCircle2 className="h-4 w-4" />,
+        label: "Completed",
         className: "bg-green-500/10 text-green-500 border-green-500/20",
       };
-    case "In Progress":
+    case "Needs Service":
       return {
         icon: <Clock className="h-4 w-4" />,
+        label: "In Progress",
         className: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
       };
-    case "Fault Found":
+    case "Under Repair":
       return {
         icon: <AlertTriangle className="h-4 w-4" />,
+        label: "Fault Found",
         className: "bg-red-500/10 text-red-500 border-red-500/20",
       };
   }
 };
 
 const MaintenanceReports = () => {
-  const completedCount = reports.filter(
-    (report) => report.status === "Completed"
-  ).length;
+  const [openDepots, setOpenDepots] = useState<number[]>([1]);
 
-  const inProgressCount = reports.filter(
-    (report) => report.status === "In Progress"
-  ).length;
+  const { data: fleet = [], isLoading, error } = useQuery({
+    queryKey: ["fleet"],
+    queryFn: getFleet,
+  });
 
-  const faultCount = reports.filter(
-    (report) => report.status === "Fault Found"
-  ).length;
+  const toggleDepot = (depotNumber: number) => {
+    setOpenDepots((prev) =>
+      prev.includes(depotNumber)
+        ? prev.filter((depot) => depot !== depotNumber)
+        : [...prev, depotNumber]
+    );
+  };
+
+  const handleViewReport = (bus: Bus) => {
+    console.log("View report for:", bus);
+    alert(`Viewing report for ${bus.name}`);
+  };
+
+  const handleDownloadReport = (bus: Bus) => {
+    console.log("Download report for:", bus);
+    alert(`Downloading report for ${bus.name}`);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <p className="text-lg font-bold text-foreground">Loading reports...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <p className="text-lg font-bold text-red-500">Error loading reports</p>
+      </div>
+    );
+  }
+
+  const completedCount = fleet.filter((bus) => bus.status === "Operational").length;
+  const inProgressCount = fleet.filter((bus) => bus.status === "Needs Service").length;
+  const faultCount = fleet.filter((bus) => bus.status === "Under Repair").length;
+
+  const depots = Array.from({ length: DEPOT_COUNT }, (_, index) => ({
+    depotNumber: index + 1,
+    buses: fleet.filter((_, busIndex) => busIndex % DEPOT_COUNT === index),
+  }));
 
   return (
     <main className="container max-w-6xl px-4 py-6 space-y-6">
@@ -107,7 +105,7 @@ const MaintenanceReports = () => {
               Maintenance Reports
             </h1>
             <p className="text-sm text-muted-foreground">
-              View completed work, active inspections and reported faults
+              View and download maintenance reports by depot and bus
             </p>
           </div>
         </div>
@@ -147,64 +145,123 @@ const MaintenanceReports = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-red-500">{faultCount}</p>
+            <p className="text-3xl font-bold text-red-500">
+              {faultCount}
+            </p>
           </CardContent>
         </Card>
       </section>
 
       <section className="rounded-xl border bg-card">
-        <div className="flex items-center justify-between border-b px-5 py-4">
-          <div>
-            <h2 className="text-lg font-bold text-foreground">
-              Recent Reports
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Latest maintenance activity across depots
-            </p>
-          </div>
-
-          <Button variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
+        <div className="border-b px-5 py-4">
+          <h2 className="text-lg font-bold text-foreground">
+            Reports by Depot
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Select a depot to view buses and generate reports
+          </p>
         </div>
 
         <div className="divide-y">
-          {reports.map((report) => {
-            const statusStyle = getStatusStyle(report.status);
+          {depots.map((depot) => {
+            const isOpen = openDepots.includes(depot.depotNumber);
 
             return (
-              <div
-                key={report.id}
-                className="flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between"
-              >
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
+              <div key={depot.depotNumber}>
+                <button
+                  type="button"
+                  onClick={() => toggleDepot(depot.depotNumber)}
+                  className="flex w-full items-center justify-between px-5 py-4 text-left hover:bg-muted/40"
+                >
+                  <div>
                     <h3 className="font-semibold text-foreground">
-                      {report.task}
+                      Depot {depot.depotNumber}
                     </h3>
-
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-medium ${statusStyle.className}`}
-                    >
-                      {statusStyle.icon}
-                      {report.status}
-                    </span>
+                    <p className="text-sm text-muted-foreground">
+                      {depot.buses.length} {depot.buses.length === 1 ? "bus" : "buses"}
+                    </p>
                   </div>
 
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {report.busName} · {report.depot} · {report.technician}
-                  </p>
+                  {isOpen ? (
+                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </button>
 
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(report.date).toLocaleDateString()}
-                  </p>
-                </div>
+                {isOpen && (
+                  <div className="space-y-3 bg-background/40 px-5 pb-5">
+                    {depot.buses.length > 0 ? (
+                      depot.buses.map((bus) => {
+                        const statusStyle = getStatusStyle(bus.status);
+                        const urgentComponents = bus.components.filter(
+                          (component) => component.status === "Urgent"
+                        ).length;
 
-                <Button variant="outline" size="sm">
-                  <Eye className="h-4 w-4 mr-2" />
-                  View Report
-                </Button>
+                        return (
+                          <div
+                            key={bus.id}
+                            className="flex flex-col gap-4 rounded-lg border bg-card px-4 py-3 md:flex-row md:items-center md:justify-between"
+                          >
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h4 className="font-semibold text-foreground">
+                                  {bus.name}
+                                </h4>
+
+                                <span
+                                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-medium ${statusStyle.className}`}
+                                >
+                                  {statusStyle.icon}
+                                  {statusStyle.label}
+                                </span>
+
+                                {urgentComponents > 0 && (
+                                  <span className="rounded-full border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs font-medium text-red-500">
+                                    {urgentComponents} urgent
+                                  </span>
+                                )}
+                              </div>
+
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {bus.plateNumber} · {bus.year} {bus.model}
+                              </p>
+
+                              <p className="text-xs text-muted-foreground">
+                                Last service: {new Date(bus.lastServiceDate).toLocaleDateString()} ·
+                                Next service: {new Date(bus.nextServiceDate).toLocaleDateString()}
+                              </p>
+                            </div>
+
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleViewReport(bus)}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Report
+                              </Button>
+
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDownloadReport(bus)}
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                Download
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="rounded-lg border border-dashed bg-card p-6 text-sm text-muted-foreground">
+                        No buses assigned to this depot.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
