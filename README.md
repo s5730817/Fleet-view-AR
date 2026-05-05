@@ -162,10 +162,10 @@ npm run dev:https
 
 These accounts work in both mock mode and seeded PostgreSQL mode:
 
-- `admin@test.com` / `password123`
-- `manager@test.com` / `password123`
-- `tech1@test.com` / `password123`
-- `tech2@test.com` / `password123`
+- `admin@test.com` / `password123`      - System Admin/office based
+- `manager@test.com` / `password123`    - Maintanance Crew Manager/field+office based
+- `tech1@test.com` / `password123`      - Tech/field based
+- `tech2@test.com` / `password123`      - Tech/field based
 
 ## How To Use The App
 
