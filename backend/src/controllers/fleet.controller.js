@@ -5,7 +5,7 @@ const { fleetService } = require("../services");
 // GET all buses
 exports.getAllBuses = async (req, res) => {
   try {
-    const buses = await fleetService.getAllBuses();
+    const buses = await fleetService.getAllBuses(req.user);
 
     res.status(200).json({
       success: true,
@@ -24,7 +24,7 @@ exports.getAllBuses = async (req, res) => {
 // GET one bus by id
 exports.getBusById = async (req, res) => {
   try {
-    const bus = await fleetService.getBusById(req.params.id);
+    const bus = await fleetService.getBusById(req.params.id, req.user);
 
     if (!bus) {
       return res.status(404).json({
@@ -49,7 +49,7 @@ exports.getBusById = async (req, res) => {
 // GET bus-scoped AR context
 exports.getBusARContext = async (req, res) => {
   try {
-    const arContext = await fleetService.getARContext(req.params.id);
+    const arContext = await fleetService.getARContext(req.params.id, req.user);
 
     if (!arContext) {
       return res.status(404).json({
@@ -77,7 +77,8 @@ exports.addMaintenanceEntry = async (req, res) => {
     const entry = await fleetService.addMaintenanceEntry(
       req.params.id,
       req.params.componentId,
-      req.body
+      req.body,
+      req.user
     );
 
     if (!entry) {

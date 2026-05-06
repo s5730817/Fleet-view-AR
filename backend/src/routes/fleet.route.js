@@ -19,10 +19,10 @@ router.get("/:id", fleetController.getBusById);
 router.get("/:id/ar-context", fleetController.getBusARContext);
 
 // CREATE a new maintenance entry for a component
-// Restricted to manager/admin roles only
+// Restricted to engineer/manager/admin roles only
 router.post(
   "/:id/components/:componentId/history",
-  authoriseRoles("manager", "admin"),
+  authoriseRoles("engineer", "manager", "admin"),
   fleetController.addMaintenanceEntry
 );
 

@@ -9,6 +9,55 @@ import {
 } from "../constants";
 import { lerpVector, slerpQuaternion } from "../arHelpers";
 
+const describeCameraBootstrapError = (error) => {
+  if (!error) {
+    return "Camera access could not be started.";
+  }
+
+  switch (error.name) {
+    case "NotAllowedError":
+    case "PermissionDeniedError":
+      return "Camera permission was denied. Allow camera access for this site in the browser and OS settings, then try AR mode again.";
+    case "NotFoundError":
+    case "DevicesNotFoundError":
+      return "No camera device was found. Connect a camera and try again.";
+    case "NotReadableError":
+    case "TrackStartError":
+      return "The camera is already in use by another app or browser tab. Close other camera apps and retry.";
+    case "SecurityError":
+      return "Camera access is blocked because the app is not running in a secure context. Use localhost or start the frontend with HTTPS for AR.";
+    default:
+      return error.message || "Camera access could not be started.";
+  }
+};
+
+const ensureCameraAccess = async () => {
+  if (typeof window === "undefined") {
+    throw new Error("Window is not available.");
+  }
+
+  if (!window.isSecureContext) {
+    const insecureError = new Error("Camera access requires a secure context.");
+    insecureError.name = "SecurityError";
+    throw insecureError;
+  }
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    const mediaError = new Error("This browser does not expose getUserMedia for the current origin.");
+    mediaError.name = "SecurityError";
+    throw mediaError;
+  }
+
+  const testStream = await navigator.mediaDevices.getUserMedia({
+    video: {
+      facingMode: { ideal: "environment" },
+    },
+    audio: false,
+  });
+
+  testStream.getTracks().forEach((track) => track.stop());
+};
+
 /**
  * Multi-marker tracker.
  *
@@ -28,6 +77,8 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
 
   const [trackingMessage, setTrackingMessage] = useState("Point the camera at one or more markers.");
   const [detectedMarkers, setDetectedMarkers] = useState([]);
+  const [centeredMarker, setCenteredMarker] = useState(null);
+  const [cameraError, setCameraError] = useState(null);
 
   const clearARScene = () => {
     const s = arStateRef.current;
@@ -57,6 +108,7 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
     arStateRef.current = {};
     markerEntriesRef.current.clear();
     setDetectedMarkers([]);
+    setCenteredMarker(null);
   };
 
   useEffect(() => {
@@ -69,8 +121,21 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
     const width = container.clientWidth || window.innerWidth || 640;
     const height = container.clientHeight || window.innerHeight || 480;
 
-    const initScene = () => {
+    const initScene = async () => {
       clearARScene();
+
+      setCameraError(null);
+
+      try {
+        await ensureCameraAccess();
+      } catch (error) {
+        if (active) {
+          const message = describeCameraBootstrapError(error);
+          setCameraError(message);
+          setTrackingMessage(message);
+        }
+        return;
+      }
 
       const scene = new THREE.Scene();
       const camera = new THREE.Camera();
@@ -315,6 +380,12 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
 
         const markersByBarcode = new Map(markers.map((m) => [m.barcodeValue, m]));
         const nextDetected = [];
+        const viewportWidth = renderer.domElement.clientWidth || window.innerWidth || 1;
+        const viewportHeight = renderer.domElement.clientHeight || window.innerHeight || 1;
+        const aimHalfSize = Math.min(viewportWidth, viewportHeight) * 0.12;
+        const viewportCenterX = viewportWidth / 2;
+        const viewportCenterY = viewportHeight / 2;
+        const projectedPosition = new THREE.Vector3();
 
         for (const [id, entry] of markerEntriesRef.current.entries()) {
           const { markerRoot, stableRoot } = entry;
@@ -352,17 +423,33 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
 
           const labelText = matchedMarker?.name?.trim() ? matchedMarker.name.trim() : `#${id}`;
           updateLabelSprite(entry, labelText, assigned);
+          projectedPosition.setFromMatrixPosition(stableRoot.matrixWorld).project(camera);
+          const screenX = ((projectedPosition.x + 1) / 2) * viewportWidth;
+          const screenY = ((1 - projectedPosition.y) / 2) * viewportHeight;
+          const distanceToCenter = Math.hypot(screenX - viewportCenterX, screenY - viewportCenterY);
+          const inAim = Math.abs(screenX - viewportCenterX) <= aimHalfSize && Math.abs(screenY - viewportCenterY) <= aimHalfSize;
+
           nextDetected.push({
             id,
             assigned,
             name: matchedMarker?.name || null,
             description: matchedMarker?.description || "",
             issuePoints: Array.isArray(matchedMarker?.issuePoints) ? matchedMarker.issuePoints : [],
+            markerType: matchedMarker?.markerType || null,
+            screenX,
+            screenY,
+            distanceToCenter,
+            inAim,
           });
         }
 
         const detected = nextDetected;
         setDetectedMarkers(detected);
+        setCenteredMarker(
+          detected
+            .filter((marker) => marker.assigned && marker.markerType === "part" && marker.inAim)
+            .sort((left, right) => left.distanceToCenter - right.distanceToCenter)[0] || null
+        );
         setTrackingMessage(
           detected.length > 0
             ? `Detected ${detected.length} marker${detected.length > 1 ? "s" : ""}${showCapturedOnly ? " (captured only)" : ""}.`
@@ -377,7 +464,15 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
       arStateRef.current.animationId = requestAnimationFrame(animate);
     };
 
-    initScene();
+    initScene().catch((error) => {
+      if (!active) {
+        return;
+      }
+
+      const message = describeCameraBootstrapError(error);
+      setCameraError(message);
+      setTrackingMessage(message);
+    });
 
     return () => {
       active = false;
@@ -389,6 +484,8 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
     arContainerRef,
     trackingMessage,
     detectedMarkers,
+    centeredMarker,
+    cameraError,
     clearARScene,
   };
 };

@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { loginUser, verify2FA } from "@/lib/api";
 
+const USER_CHANGED_EVENT = "transitlens:user-changed";
+
 const Login = () => {
   const navigate = useNavigate();
 
@@ -41,6 +43,7 @@ const Login = () => {
       // Fallback (shouldn't happen with 2FA enabled)
       localStorage.setItem("token", result.token);
       localStorage.setItem("user", JSON.stringify(result.user));
+      window.dispatchEvent(new Event(USER_CHANGED_EVENT));
 
       navigate("/dashboard");
     } catch (err) {
@@ -65,6 +68,7 @@ const Login = () => {
 
       localStorage.setItem("token", result.token);
       localStorage.setItem("user", JSON.stringify(result.user));
+      window.dispatchEvent(new Event(USER_CHANGED_EVENT));
 
       navigate("/dashboard");
     } catch (err) {

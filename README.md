@@ -146,7 +146,7 @@ If you need LAN access, include your machine IP:
 
 ```bash
 cd frontend
-DEV_CERT_HOSTS=localhost,127.0.0.1,::1,192.168.0.109 npm run cert:dev
+DEV_CERT_HOSTS=localhost,127.0.0.1,::1,<LAN-machine-IP> npm run cert:dev
 ```
 
 3. Trust `frontend/ca.crt` on the device you are testing with.
@@ -162,10 +162,10 @@ npm run dev:https
 
 These accounts work in both mock mode and seeded PostgreSQL mode:
 
-- `admin@test.com` / `password123`
-- `manager@test.com` / `password123`
-- `tech1@test.com` / `password123`
-- `tech2@test.com` / `password123`
+- `admin@test.com` / `password123`      - System Admin/office based
+- `manager@test.com` / `password123`    - Maintanance Crew Manager/field+office based
+- `tech1@test.com` / `password123`      - Tech/field based
+- `tech2@test.com` / `password123`      - Tech/field based
 
 ## How To Use The App
 
@@ -201,7 +201,7 @@ Current shared part markers:
 - `24` Suspension
 - `25` Cooling System
 - `26` Transmission
-- `27` Electrical Systems
+- `27` Electrical System
 
 Formula:
 
@@ -227,3 +227,5 @@ Current tool markers in each depot:
 7. `506` Battery Tester
 8. `507` Coolant Pressure Tester
 9. `508` Multimeter
+
+See ./markers

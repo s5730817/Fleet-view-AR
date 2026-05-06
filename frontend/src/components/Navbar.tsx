@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Menu, User } from "lucide-react";
 
+const USER_CHANGED_EVENT = "transitlens:user-changed";
+
 export function Navbar() {
   const navigate = useNavigate();
 
@@ -17,6 +19,7 @@ export function Navbar() {
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    window.dispatchEvent(new Event(USER_CHANGED_EVENT));
     navigate("/");
   };
 

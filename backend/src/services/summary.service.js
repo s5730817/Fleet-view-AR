@@ -25,8 +25,8 @@ exports.getSummaryData = async () => {
     ],
 
     onTimeOverdueData: [
-      { name: "On Time", value: 941 },
-      { name: "Overdue", value: 138 }
+      { name: "On Time Jobs", value: 941 },
+      { name: "Jobs Overdue", value: 138 }
     ],
 
     jobsByStatusData: [

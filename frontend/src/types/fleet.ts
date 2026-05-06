@@ -1,9 +1,42 @@
 // This file defines shared TypeScript types for fleet data.
 // These types match what the backend returns.
 
-export type BusStatus = "Operational" | "Needs Service" | "Under Repair";
+export type BusStatus = "Good" | "Requires Attention" | "Out Of Operation";
 
-export type ComponentStatus = "Good" | "Due Soon" | "Urgent";
+export type ComponentStatus =
+  | "Good"
+  | "Requires Attention"
+  | "Replacement Recommended"
+  | "Needs Replacement!"
+  | "Needs Fix or Replacement"
+  | "Under Repair";
+
+export type IssueIndicatorState = "none" | "open_reports" | "needs_fix" | "under_repair";
+
+export type ServiceIndicatorState =
+  | "ok"
+  | "due_soon"
+  | "due_today"
+  | "overdue"
+  | "unscheduled";
+
+export type ComponentIndicatorState = "good" | "watch" | "repair_needed" | "replace_recommended";
+
+export type ComponentDisplayState =
+  | "good"
+  | "requires_attention"
+  | "replacement_recommended"
+  | "needs_replacement"
+  | "needs_fix_or_replacement"
+  | "under_repair";
+
+export type BusComponentSummaryState = "good" | "requires_attention" | "out_of_operation";
+
+export type LifecycleState =
+  | "within_expected_life"
+  | "near_end_of_life"
+  | "beyond_expected_life"
+  | "beyond_life_approved";
 
 export type HistoryEntryType =
   | "service"
@@ -31,12 +64,47 @@ export interface BusComponent {
   markerCode?: number;
   icon: string;
   status: ComponentStatus;
+  statusState: ComponentDisplayState;
+  statusNote?: string | null;
+  conditionState: ComponentIndicatorState;
+  conditionLabel: string;
+  lifecycleState: LifecycleState;
+  lifecycleLabel: string;
+  maintenanceIndicator: BusServiceIndicator;
+  activeIssueCount: number;
+  inProgressIssueCount: number;
   lastRepair: string;
+  lastInspected?: string;
   lastService: string;
   lastReplacement: string;
-  healthPercent: number;
   history: MaintenanceEntry[];
   arInstructions: string[];
+}
+
+export interface BusIssueIndicator {
+  state: IssueIndicatorState;
+  label: string;
+  activeCount: number;
+  inProgressCount: number;
+}
+
+export interface BusServiceIndicator {
+  state: ServiceIndicatorState;
+  label: string;
+  dueDate: string | null;
+  daysUntilDue: number | null;
+  isDueSoon: boolean;
+  isOverdue: boolean;
+}
+
+export interface BusComponentIndicator {
+  state: BusComponentSummaryState;
+  label: string;
+  requiresAttentionCount: number;
+  outOfOperationCount: number;
+  overdueMaintenanceCount: number;
+  openReportCount: number;
+  replacementCount: number;
 }
 
 export interface Bus {
@@ -51,6 +119,9 @@ export interface Bus {
   nextServiceDate: string;
   year: number;
   model: string;
+  issueIndicator: BusIssueIndicator;
+  componentIndicator: BusComponentIndicator;
+  serviceIndicator: BusServiceIndicator;
   components: BusComponent[];
 }
 
@@ -96,7 +167,10 @@ export interface ARBusPart {
   markerCode: number;
   icon: string;
   status: ComponentStatus | string;
-  healthPercent: number;
+  conditionState: ComponentIndicatorState;
+  conditionLabel: string;
+  lifecycleState: LifecycleState;
+  lifecycleLabel: string;
   arInstructions: string[];
   issueTypeOptions: ARIssueTypeOption[];
   activeIssues: ARIssue[];

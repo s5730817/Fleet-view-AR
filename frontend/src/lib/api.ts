@@ -74,7 +74,7 @@ export const addMaintenanceEntry = async (
   const json = await res.json();
 
   if (!json.success) {
-    throw new Error("Failed to add maintenance entry");
+    throw new Error(json.error || "Failed to add maintenance entry");
   }
 
   return json.data;
@@ -208,6 +208,28 @@ export const createFault = async ({
 
   if (!json.success) {
     throw new Error(json.error || "Failed to create issue");
+  }
+
+  return json.data;
+};
+
+export const updateFaultStatus = async (
+  issueId: string,
+  body: {
+    status: "reported" | "in_progress" | "awaiting_approval" | "resolved";
+    created_by?: string | null;
+  }
+) => {
+  const res = await fetch(`${API_URL}/faults/${issueId}/status`, {
+    method: "PATCH",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+
+  const json = await res.json();
+
+  if (!json.success) {
+    throw new Error(json.error || "Failed to update issue status");
   }
 
   return json.data;
