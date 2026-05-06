@@ -18,25 +18,37 @@ import { Button } from "@/components/ui/button";
 
 const DEPOT_COUNT = 6;
 
+
 const getStatusStyle = (status: Bus["status"]) => {
   switch (status) {
-    case "Operational":
+    case "Good":
       return {
         icon: <CheckCircle2 className="h-4 w-4" />,
         label: "Completed",
         className: "bg-green-500/10 text-green-500 border-green-500/20",
       };
-    case "Needs Service":
+
+    case "Requires Attention":
       return {
         icon: <Clock className="h-4 w-4" />,
         label: "In Progress",
         className: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
       };
-    case "Under Repair":
+
+    case "Out Of Operation":
       return {
         icon: <AlertTriangle className="h-4 w-4" />,
         label: "Fault Found",
         className: "bg-red-500/10 text-red-500 border-red-500/20",
+      };
+
+    default:
+      console.warn("Unknown bus status:", status);
+
+      return {
+        icon: <AlertTriangle className="h-4 w-4" />,
+        label: "Unknown",
+        className: "bg-gray-500/10 text-gray-500 border-gray-500/20",
       };
   }
 };
@@ -191,8 +203,11 @@ const MaintenanceReports = () => {
 
                 {isOpen && (
                   <div className="space-y-3 bg-background/40 px-5 pb-5">
+                    
                     {depot.buses.length > 0 ? (
+                      
                       depot.buses.map((bus) => {
+                        console.log("BUS STATUS:", bus.status);
                         const statusStyle = getStatusStyle(bus.status);
                         const urgentComponents = bus.components.filter(
                           (component) => component.status === "Urgent"

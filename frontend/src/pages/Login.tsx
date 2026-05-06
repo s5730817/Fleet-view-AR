@@ -48,8 +48,14 @@ const Login = () => {
       navigate("/dashboard");
     } catch (err) {
       console.error("Login failed:", err);
-      setError("Invalid email or password");
-    } finally {
+
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Invalid email or password";
+
+      setError(message);
+    }finally {
       setLoading(false);
     }
   };
