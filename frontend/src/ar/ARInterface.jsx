@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { usePermission } from "@/context/PermissionContext";
 import { useToast } from "@/hooks/use-toast";
-import { addFaultUpdate, createFault } from "@/lib/api";
+import { addFaultUpdate, addMaintenanceEntry, createFault, updateFaultStatus } from "@/lib/api";
 import { APP_STATES } from "./constants";
 import { useAREngine } from "./hooks/useAREngine";
 import { useARTracking } from "./hooks/useARTracking";
@@ -29,7 +29,7 @@ export default function ARInterface({ arContext, onExit, onIssueCreated }) {
       ...arContext.parts.map((part) => ({
         barcodeValue: part.markerCode,
         name: part.name,
-        description: `${part.status} · ${part.healthPercent}% health`,
+        description: `${part.conditionLabel} · ${part.lifecycleLabel}`,
         issuePoints: part.activeIssues,
         markerType: "part",
       })),
@@ -50,6 +50,10 @@ export default function ARInterface({ arContext, onExit, onIssueCreated }) {
     showCapturedOnly: showDetectedOnly,
   });
   const canCreate = hasPermission("create");
+  const aimedPart = useMemo(
+    () => arContext.parts.find((part) => part.markerCode === tracking.centeredMarker?.id) || null,
+    [arContext.parts, tracking.centeredMarker],
+  );
 
   const getStoredUser = () => {
     try {
@@ -110,6 +114,41 @@ export default function ARInterface({ arContext, onExit, onIssueCreated }) {
     }
   };
 
+  const handleBeginRepair = async ({ partId, issueId }) => {
+    const storedUser = getStoredUser();
+
+    await updateFaultStatus(issueId, {
+      status: "in_progress",
+      created_by: storedUser.id || null,
+    });
+
+    await onIssueCreated?.();
+
+    toast({
+      title: "Repair started",
+      description: "Tool tracking and repair steps are now active.",
+    });
+  };
+
+  const handleCompleteMaintenance = async ({ partId, issue }) => {
+    const storedUser = getStoredUser();
+    const entryType = issue.recommendedAction === "replacement" ? "replacement" : "repair";
+
+    await addMaintenanceEntry(arContext.bus.id, partId, {
+      type: entryType,
+      description: `AR ${entryType} sign-off for ${issue.title}`,
+      technician: storedUser.name || storedUser.email || "Engineer",
+      notes: `Completed in AR mode using guide: ${issue.guide.title}`,
+    });
+
+    await onIssueCreated?.();
+
+    toast({
+      title: entryType === "replacement" ? "Replacement signed off" : "Repair signed off",
+      description: `${issue.title} was completed in AR mode.`,
+    });
+  };
+
   return (
     <TrackingView
       arContainerRef={tracking.arContainerRef}
@@ -120,10 +159,13 @@ export default function ARInterface({ arContext, onExit, onIssueCreated }) {
       role={role}
       trackingMessage={tracking.trackingMessage}
       detectedMarkers={tracking.detectedMarkers}
-      arError={arError}
+      aimedPart={aimedPart}
+      arError={tracking.cameraError || arError}
       showDetectedOnly={showDetectedOnly}
       onToggleShowDetectedOnly={setShowDetectedOnly}
       onCreateIssue={handleCreateIssue}
+      onBeginRepair={handleBeginRepair}
+      onCompleteMaintenance={handleCompleteMaintenance}
       canCreate={canCreate}
       onExit={onExit}
     />

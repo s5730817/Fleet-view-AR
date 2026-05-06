@@ -9,12 +9,14 @@ import { Wrench, RefreshCw, Replace } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
+type MaintenanceEntryDraft = Omit<MaintenanceEntry, "id">;
+
 interface MaintenanceLogModalProps {
   open: boolean;
   onClose: () => void;
   component: BusComponent | null;
   busName: string;
-  onLogSubmit: (componentId: string, entry: MaintenanceEntry) => void;
+  onLogSubmit: (componentId: string, entry: MaintenanceEntryDraft) => Promise<void>;
 }
 
 type MaintenanceType = "repair" | "service" | "replacement";
@@ -30,15 +32,15 @@ export function MaintenanceLogModal({ open, onClose, component, busName, onLogSu
   const [description, setDescription] = useState("");
   const [technician, setTechnician] = useState("");
   const [notes, setNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!description || !technician) {
       toast.error("Please fill in required fields");
       return;
     }
 
-    const newEntry: MaintenanceEntry = {
-      id: `${component!.id}-${Date.now()}`,
+    const newEntry: MaintenanceEntryDraft = {
       date: new Date().toISOString().split("T")[0],
       type,
       description,
@@ -46,15 +48,21 @@ export function MaintenanceLogModal({ open, onClose, component, busName, onLogSu
       notes: notes || undefined,
     };
 
-    onLogSubmit(component!.id, newEntry);
-
-    toast.success(`${typeConfig[type].label} logged for ${component?.name}`, {
-      description: `Technician: ${technician}`,
-    });
-    setDescription("");
-    setTechnician("");
-    setNotes("");
-    onClose();
+    try {
+      setSubmitting(true);
+      await onLogSubmit(component!.id, newEntry);
+      toast.success(`${typeConfig[type].label} logged for ${component?.name}`, {
+        description: `Technician: ${technician}`,
+      });
+      setDescription("");
+      setTechnician("");
+      setNotes("");
+      onClose();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to log maintenance");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (!component) return null;
@@ -104,8 +112,10 @@ export function MaintenanceLogModal({ open, onClose, component, busName, onLogSu
           </div>
 
           <div className="flex gap-2 pt-2">
-            <Button variant="outline" onClick={onClose} className="flex-1">Cancel</Button>
-            <Button onClick={handleSubmit} className="flex-1">Submit Log</Button>
+            <Button variant="outline" onClick={onClose} className="flex-1" disabled={submitting}>Cancel</Button>
+            <Button onClick={handleSubmit} className="flex-1" disabled={submitting}>
+              {submitting ? "Saving..." : "Submit Log"}
+            </Button>
           </div>
         </div>
       </DialogContent>

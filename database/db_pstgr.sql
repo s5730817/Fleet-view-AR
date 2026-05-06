@@ -57,12 +57,25 @@ CREATE TABLE "bus_parts" (
   "name" text NOT NULL,
   "marker_code" int,
   "icon_key" text,
-  "status" text,
-  "health_percent" int,
+  "condition_state" text,
+  "lifecycle_state" text,
   "last_repair_at" timestamp,
+  "last_inspected_at" timestamp,
   "last_service_at" timestamp,
   "last_replacement_at" timestamp,
   "ar_instructions" jsonb
+);
+
+CREATE TABLE "part_lifecycle_policies" (
+  "id" uuid PRIMARY KEY,
+  "part_code" text UNIQUE NOT NULL,
+  "usage_model" text NOT NULL,
+  "expected_life_days" int,
+  "expected_life_mileage" int,
+  "inspection_interval_days" int,
+  "replacement_rule" text,
+  "created_at" timestamp,
+  "updated_at" timestamp
 );
 
 CREATE TABLE "issue_types" (
@@ -199,6 +212,8 @@ CREATE UNIQUE INDEX ON "buses" ("registration_number");
 
 CREATE UNIQUE INDEX ON "bus_parts" ("bus_id", "marker_code");
 
+CREATE UNIQUE INDEX ON "part_lifecycle_policies" ("part_code");
+
 CREATE INDEX ON "issue_types" ("part_code");
 
 CREATE INDEX ON "issue_types" ("label");
@@ -261,7 +276,11 @@ CREATE INDEX ON "activity_logs" ("created_at");
 
 COMMENT ON COLUMN "tools"."status" IS 'available | in_use | awaiting_return';
 
-COMMENT ON COLUMN "bus_parts"."status" IS 'good | due_soon | urgent';
+COMMENT ON COLUMN "bus_parts"."condition_state" IS 'good | watch | repair_needed | replace_recommended';
+
+COMMENT ON COLUMN "bus_parts"."lifecycle_state" IS 'within_expected_life | near_end_of_life | beyond_expected_life | beyond_life_approved';
+
+COMMENT ON COLUMN "part_lifecycle_policies"."usage_model" IS 'days | mileage | issue_burden | inspection';
 
 COMMENT ON COLUMN "issue_types"."recommended_action" IS 'repair | replacement';
 
@@ -286,6 +305,9 @@ ALTER TABLE "tools" ADD FOREIGN KEY ("last_used_by") REFERENCES "users" ("id") D
 ALTER TABLE "buses" ADD FOREIGN KEY ("depot_id") REFERENCES "depots" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "bus_parts" ADD FOREIGN KEY ("bus_id") REFERENCES "buses" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "part_lifecycle_policies" ADD CONSTRAINT "part_lifecycle_policies_part_code_check"
+  CHECK (part_code <> '');
 
 ALTER TABLE "issues" ADD FOREIGN KEY ("bus_part_id") REFERENCES "bus_parts" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 

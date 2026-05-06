@@ -1,6 +1,9 @@
+const { randomUUID } = require("crypto");
 const db = require("../database/db");
 
-exports.getAllBuses = async () => {
+const ACTIVE_ISSUE_STATUSES = ["reported", "in_progress", "awaiting_approval"];
+
+exports.getAllBuses = async ({ depotId = null } = {}) => {
   const result = await db.query(
     `SELECT
       buses.id,
@@ -16,13 +19,15 @@ exports.getAllBuses = async () => {
       buses.model
      FROM buses
      LEFT JOIN depots ON depots.id = buses.depot_id
-     ORDER BY name NULLS LAST, registration_number ASC`
+     WHERE ($1::uuid IS NULL OR buses.depot_id = $1)
+       ORDER BY name NULLS LAST, registration_number ASC`,
+    [depotId]
   );
 
   return result.rows;
 };
 
-exports.getBusById = async (id) => {
+exports.getBusById = async (id, { depotId = null } = {}) => {
   const result = await db.query(
     `SELECT
       buses.id,
@@ -38,8 +43,9 @@ exports.getBusById = async (id) => {
       buses.model
      FROM buses
      LEFT JOIN depots ON depots.id = buses.depot_id
-     WHERE buses.id = $1`,
-    [id]
+       WHERE buses.id = $1
+         AND ($2::uuid IS NULL OR buses.depot_id = $2)`,
+    [id, depotId]
   );
 
   return result.rows[0] || null;
@@ -57,9 +63,10 @@ exports.getPartsForBusIds = async (busIds) => {
       name,
       marker_code,
       icon_key,
-      status,
-      health_percent,
+      condition_state,
+      lifecycle_state,
       last_repair_at,
+      last_inspected_at,
       last_service_at,
       last_replacement_at,
       ar_instructions
@@ -68,6 +75,199 @@ exports.getPartsForBusIds = async (busIds) => {
      ORDER BY name ASC`,
     [busIds]
   );
+
+  return result.rows;
+};
+
+exports.getLifecyclePoliciesForPartCodes = async (partCodes) => {
+  const normalizedCodes = [...new Set(partCodes.filter(Boolean))];
+  if (normalizedCodes.length === 0) {
+    return [];
+  }
+
+  const result = await db.query(
+    `SELECT
+      part_code,
+      usage_model,
+      expected_life_days,
+      expected_life_mileage,
+      inspection_interval_days,
+      replacement_rule
+     FROM part_lifecycle_policies
+     WHERE part_code = ANY($1::text[])`,
+    [normalizedCodes]
+  );
+
+  return result.rows;
+};
+
+exports.updatePartLifecycleAfterMaintenance = async (partId, entryType, executor = db) => {
+  if (!partId || !entryType) {
+    return null;
+  }
+
+  const updateByType = {
+    service: {
+      condition_state: "good",
+      lifecycle_state: null,
+      timestampColumn: "last_service_at",
+      inspected: true
+    },
+    repair: {
+      condition_state: "good",
+      lifecycle_state: null,
+      timestampColumn: "last_repair_at",
+      inspected: true
+    },
+    replacement: {
+      condition_state: "good",
+      lifecycle_state: "within_expected_life",
+      timestampColumn: "last_replacement_at",
+      inspected: true
+    }
+  };
+
+  const update = updateByType[entryType];
+  if (!update) {
+    return null;
+  }
+
+  const fields = [
+    `condition_state = $1`,
+    `${update.timestampColumn} = NOW()`,
+    `last_inspected_at = NOW()`
+  ];
+  const values = [update.condition_state];
+
+  if (update.lifecycle_state !== null) {
+    fields.push(`lifecycle_state = $${values.length + 1}`);
+    values.push(update.lifecycle_state);
+  }
+
+  values.push(partId);
+
+  await executor.query(
+    `UPDATE bus_parts
+     SET ${fields.join(", ")}
+     WHERE id = $${values.length}`,
+    values
+  );
+
+  return true;
+};
+
+exports.updatePartConditionFromIssue = async (partId, recommendedAction, executor = db) => {
+  if (!partId) {
+    return null;
+  }
+
+  const nextConditionState = recommendedAction === "replacement"
+    ? "replace_recommended"
+    : "repair_needed";
+  const fields = [`condition_state = $1`];
+  const values = [nextConditionState];
+
+  values.push(partId);
+
+  await executor.query(
+    `UPDATE bus_parts
+     SET ${fields.join(", ")}
+     WHERE id = $${values.length}`,
+    values
+  );
+
+  return true;
+};
+
+exports.reconcilePartConditionFromActiveIssues = async (partId, executor = db) => {
+  if (!partId) {
+    return null;
+  }
+
+  const [partResult, issueResult] = await Promise.all([
+    executor.query(
+      `SELECT condition_state
+       FROM bus_parts
+       WHERE id = $1`,
+      [partId]
+    ),
+    executor.query(
+      `SELECT issue_types.recommended_action
+       FROM issues
+       LEFT JOIN issue_types ON issue_types.id = issues.issue_type_id
+       WHERE issues.bus_part_id = $1
+         AND issues.status = ANY($2::text[])`,
+      [partId, ACTIVE_ISSUE_STATUSES]
+    )
+  ]);
+
+  const currentConditionState = partResult.rows[0]?.condition_state || "good";
+  const hasActiveIssues = issueResult.rows.length > 0;
+  const nextConditionState = hasActiveIssues
+    ? issueResult.rows.some((issue) => issue.recommended_action === "replacement")
+      ? "replace_recommended"
+      : "repair_needed"
+    : ACTIVE_ISSUE_STATUSES.includes(currentConditionState)
+      ? currentConditionState
+      : ["repair_needed", "replace_recommended"].includes(currentConditionState)
+        ? "good"
+        : currentConditionState;
+
+  await executor.query(
+    `UPDATE bus_parts
+     SET condition_state = $1
+     WHERE id = $2`,
+    [nextConditionState, partId]
+  );
+
+  return nextConditionState;
+};
+
+exports.resolveActiveIssuesForPart = async ({ partId, createdBy, note }, executor = db) => {
+  if (!partId) {
+    return [];
+  }
+
+  const result = await executor.query(
+    `WITH active_issues AS (
+       SELECT id, title, status
+       FROM issues
+       WHERE bus_part_id = $1
+         AND status = ANY($2::text[])
+     )
+     UPDATE issues AS current_issue
+     SET status = 'resolved',
+         resolved_at = NOW(),
+         updated_at = NOW()
+     FROM active_issues
+     WHERE current_issue.id = active_issues.id
+     RETURNING current_issue.id, active_issues.title, active_issues.status`,
+    [partId, ACTIVE_ISSUE_STATUSES]
+  );
+
+  for (const issue of result.rows) {
+    await executor.query(
+      `INSERT INTO issue_updates (
+        id,
+        issue_id,
+        created_at,
+        created_by,
+        update_type,
+        description,
+        status_from,
+        status_to,
+        new_issue_id
+      )
+      VALUES ($1, $2, NOW(), $3, 'status_change', $4, $5, 'resolved', NULL)`,
+      [
+        randomUUID(),
+        issue.id,
+        createdBy || null,
+        note || `Issue resolved through maintenance on ${issue.title || "component"}`,
+        issue.status
+      ]
+    );
+  }
 
   return result.rows;
 };
@@ -232,11 +432,7 @@ exports.getToolsForDepot = async (depotId) => {
   return result.rows;
 };
 
-exports.getAssignableUsersForDepot = async (depotId) => {
-  if (!depotId) {
-    return [];
-  }
-
+exports.getAssignableUsersForDepot = async (depotId = null) => {
   const result = await db.query(
     `SELECT
       users.id,
@@ -245,9 +441,9 @@ exports.getAssignableUsersForDepot = async (depotId) => {
       roles.name AS role
      FROM users
      LEFT JOIN roles ON roles.id = users.role_id
-     WHERE users.depot_id = $1
-       AND users.deleted_at IS NULL
+     WHERE users.deleted_at IS NULL
        AND roles.name IN ('engineer', 'manager', 'admin')
+       AND ($1::uuid IS NULL OR users.depot_id = $1)
      ORDER BY
        CASE roles.name
          WHEN 'engineer' THEN 1
@@ -293,8 +489,8 @@ exports.createMaintenanceEntry = async ({
   entry_type,
   description,
   notes
-}) => {
-  const result = await db.query(
+}, executor = db) => {
+  const result = await executor.query(
     `INSERT INTO maintenance_entries (
       id,
       bus_part_id,

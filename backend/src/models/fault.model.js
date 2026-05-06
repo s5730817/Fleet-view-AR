@@ -105,6 +105,27 @@ exports.getFaultById = async (id) => {
   return result.rows[0] || null;
 };
 
+exports.getIssueTypeById = async (id) => {
+  if (!id) {
+    return null;
+  }
+
+  const result = await db.query(
+    `SELECT
+      id,
+      part_code,
+      code,
+      label,
+      default_priority,
+      recommended_action
+     FROM issue_types
+     WHERE id = $1`,
+    [id]
+  );
+
+  return result.rows[0] || null;
+};
+
 // Create a new fault
 exports.createFault = async ({ id, bus_part_id, issue_type_id, created_by, title, description, status, priority, source }, executor = db) => {
   await executor.query(
@@ -140,10 +161,12 @@ exports.createIssueAssignment = async ({ id, issue_id, user_id, assigned_at }, e
 };
 
 // Update a fault's status
-exports.updateFaultStatus = async (id, status) => {
-  await db.query(
+exports.updateFaultStatus = async (id, status, executor = db) => {
+  await executor.query(
     `UPDATE issues
-     SET status = $1, updated_at = NOW()
+     SET status = $1,
+         updated_at = NOW(),
+         resolved_at = CASE WHEN $1 = 'resolved' THEN NOW() ELSE NULL END
      WHERE id = $2`,
     [status, id]
   );
@@ -159,8 +182,8 @@ exports.createFaultUpdate = async ({
   status_from,
   status_to,
   new_issue_id
-}) => {
-  await db.query(
+}, executor = db) => {
+  await executor.query(
     `INSERT INTO issue_updates (
       id,
       issue_id,

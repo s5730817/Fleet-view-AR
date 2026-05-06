@@ -3,6 +3,7 @@
 const { randomUUID } = require("crypto");
 const db = require("../database/db");
 const faultModel = require("../models/fault.model");
+const fleetModel = require("../models/fleet.model");
 const {
   allowedStatuses,
   allowedPriorities,
@@ -80,6 +81,10 @@ exports.createFault = async ({
       source: source || null
     }, client);
 
+    if (bus_part_id) {
+      await fleetModel.reconcilePartConditionFromActiveIssues(bus_part_id, client);
+    }
+
     if (assigned_user_id) {
       await faultModel.createIssueAssignment({
         id: randomUUID(),
@@ -111,17 +116,23 @@ exports.updateFaultStatus = async (id, { status, created_by }) => {
 
   const oldStatus = existingFault.status;
 
-  await faultModel.updateFaultStatus(id, status);
+  await db.withTransaction(async (client) => {
+    await faultModel.updateFaultStatus(id, status, client);
 
-  await faultModel.createFaultUpdate({
-    id: randomUUID(),
-    issue_id: id,
-    created_by: created_by || null,
-    update_type: "status_change",
-    description: `Status changed from ${oldStatus} to ${status}`,
-    status_from: oldStatus,
-    status_to: status,
-    new_issue_id: null
+    await faultModel.createFaultUpdate({
+      id: randomUUID(),
+      issue_id: id,
+      created_by: created_by || null,
+      update_type: "status_change",
+      description: `Status changed from ${oldStatus} to ${status}`,
+      status_from: oldStatus,
+      status_to: status,
+      new_issue_id: null
+    }, client);
+
+    if (existingFault.bus_part_id) {
+      await fleetModel.reconcilePartConditionFromActiveIssues(existingFault.bus_part_id, client);
+    }
   });
 
   return await faultModel.getFaultById(id);

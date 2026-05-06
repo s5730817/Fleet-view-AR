@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export function TrackingView({
   arContainerRef,
@@ -9,49 +9,112 @@ export function TrackingView({
   role,
   trackingMessage,
   detectedMarkers,
+  aimedPart,
   arError,
   onExit,
   showDetectedOnly,
   onToggleShowDetectedOnly,
   onCreateIssue,
+  onBeginRepair,
+  onCompleteMaintenance,
   canCreate,
 }) {
   const [isIssueOpen, setIsIssueOpen] = useState(false);
+  const [isEngineerActionOpen, setIsEngineerActionOpen] = useState(false);
   const [selectedPartId, setSelectedPartId] = useState(null);
   const [selectedIssueTypeId, setSelectedIssueTypeId] = useState("");
-  const [selectedAssigneeId, setSelectedAssigneeId] = useState(assignableUsers[0]?.id || "");
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState("");
+  const [selectedRepairIssueId, setSelectedRepairIssueId] = useState("");
+  const [engineerActionMode, setEngineerActionMode] = useState("issue");
   const [issueNote, setIssueNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [repairWorkflow, setRepairWorkflow] = useState(null);
+  const [currentStepChecked, setCurrentStepChecked] = useState(false);
+  const [isSigningOff, setIsSigningOff] = useState(false);
 
   const isManagerView = canCreate;
+  const isEngineerView = !isManagerView;
   const detectedMarkerIds = useMemo(
     () => new Set((detectedMarkers || []).map((marker) => marker.id)),
     [detectedMarkers],
   );
-  const visibleTools = useMemo(
-    () => (showDetectedOnly ? tools.filter((tool) => detectedMarkerIds.has(tool.markerCode)) : tools),
-    [showDetectedOnly, tools, detectedMarkerIds],
+  const detectedTools = useMemo(
+    () => tools.filter((tool) => detectedMarkerIds.has(tool.markerCode)),
+    [tools, detectedMarkerIds],
   );
   const detectedPartMarkers = useMemo(
     () => parts.filter((part) => detectedMarkerIds.has(part.markerCode)),
     [parts, detectedMarkerIds],
   );
-  const mechanicVisibleParts = useMemo(
-    () => (showDetectedOnly ? detectedPartMarkers : parts),
-    [showDetectedOnly, detectedPartMarkers, parts],
-  );
   const selectedPart = useMemo(
-    () => parts.find((part) => part.id === selectedPartId) || detectedPartMarkers[0] || null,
-    [parts, selectedPartId, detectedPartMarkers],
+    () => parts.find((part) => part.id === selectedPartId) || aimedPart || detectedPartMarkers[0] || null,
+    [parts, selectedPartId, aimedPart, detectedPartMarkers],
   );
   const selectedIssueType = useMemo(
     () => selectedPart?.issueTypeOptions.find((option) => option.id === selectedIssueTypeId) || selectedPart?.issueTypeOptions[0] || null,
     [selectedIssueTypeId, selectedPart],
   );
+  const selectedRepairIssue = useMemo(
+    () => selectedPart?.activeIssues.find((issue) => issue.id === selectedRepairIssueId) || selectedPart?.activeIssues[0] || null,
+    [selectedPart, selectedRepairIssueId],
+  );
+  const detectedToolNames = useMemo(
+    () => detectedTools.map((tool) => tool.name),
+    [detectedTools],
+  );
+  const workflowSteps = repairWorkflow?.guide?.steps || [];
+  const currentWorkflowStep = workflowSteps[repairWorkflow?.currentStepIndex || 0] || null;
+
+  useEffect(() => {
+    if (!repairWorkflow) {
+      return;
+    }
+
+    const requiredTools = repairWorkflow.guide?.requiredToolTypes || [];
+
+    if (requiredTools.length === 0) {
+      if (!repairWorkflow.toolsConfirmed) {
+        setRepairWorkflow((currentWorkflow) => currentWorkflow ? { ...currentWorkflow, toolsConfirmed: true } : currentWorkflow);
+      }
+      return;
+    }
+
+    const nextFoundToolTypes = requiredTools.filter((toolName) => detectedToolNames.includes(toolName));
+
+    if (nextFoundToolTypes.length === 0) {
+      return;
+    }
+
+    setRepairWorkflow((currentWorkflow) => {
+      if (!currentWorkflow) {
+        return currentWorkflow;
+      }
+
+      const foundToolTypes = [...new Set([...(currentWorkflow.foundToolTypes || []), ...nextFoundToolTypes])];
+      const toolsConfirmed = requiredTools.every((toolName) => foundToolTypes.includes(toolName));
+
+      if (
+        toolsConfirmed === currentWorkflow.toolsConfirmed
+        && foundToolTypes.length === (currentWorkflow.foundToolTypes || []).length
+      ) {
+        return currentWorkflow;
+      }
+
+      return {
+        ...currentWorkflow,
+        foundToolTypes,
+        toolsConfirmed,
+      };
+    });
+  }, [detectedToolNames, repairWorkflow]);
 
   const reportButtonLabel = detectedPartMarkers.length > 0
     ? `Report issue on ${detectedPartMarkers[0].name}`
     : "Point camera at a part marker";
+
+  const choosePartLabel = aimedPart
+    ? `Choose ${aimedPart.name}`
+    : "Point the aim helper at a part marker";
 
   const getPriorityClass = (priority) => {
     switch (priority) {
@@ -101,6 +164,20 @@ export function TrackingView({
     setIsIssueOpen(true);
   };
 
+  const openEngineerActionPopup = () => {
+    if (!aimedPart) {
+      return;
+    }
+
+    setSelectedPartId(aimedPart.id);
+    setSelectedIssueTypeId(aimedPart.issueTypeOptions[0]?.id || "");
+    setSelectedAssigneeId("");
+    setSelectedRepairIssueId(aimedPart.activeIssues[0]?.id || "");
+    setEngineerActionMode(aimedPart.activeIssues.length > 0 ? "fix" : "issue");
+    setIssueNote("");
+    setIsEngineerActionOpen(true);
+  };
+
   const handleIssueSubmit = async () => {
     if (!selectedPart || !selectedIssueType) {
       return;
@@ -123,9 +200,104 @@ export function TrackingView({
     }
   };
 
+  const handleEngineerIssueSubmit = async () => {
+    if (!selectedPart || !selectedIssueType) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await onCreateIssue({
+        partId: selectedPart.id,
+        issueTypeId: selectedIssueType.id,
+        assignedUserId: selectedAssigneeId || null,
+        note: issueNote.trim(),
+      });
+
+      setIsEngineerActionOpen(false);
+      setIssueNote("");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEngineerFixStart = async () => {
+    if (!selectedPart || !selectedRepairIssue) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await onBeginRepair({
+        partId: selectedPart.id,
+        issueId: selectedRepairIssue.id,
+      });
+
+      setRepairWorkflow({
+        partId: selectedPart.id,
+        partName: selectedPart.name,
+        issue: selectedRepairIssue,
+        guide: selectedRepairIssue.guide,
+        currentStepIndex: 0,
+        foundToolTypes: [],
+        toolsConfirmed: false,
+      });
+      setCurrentStepChecked(false);
+      setIsEngineerActionOpen(false);
+      setIssueNote("");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleNextStep = () => {
+    setRepairWorkflow((currentWorkflow) => {
+      if (!currentWorkflow) {
+        return currentWorkflow;
+      }
+
+      return {
+        ...currentWorkflow,
+        currentStepIndex: currentWorkflow.currentStepIndex + 1,
+      };
+    });
+    setCurrentStepChecked(false);
+  };
+
+  const handleSignOff = async () => {
+    if (!repairWorkflow) {
+      return;
+    }
+
+    setIsSigningOff(true);
+
+    try {
+      await onCompleteMaintenance({
+        partId: repairWorkflow.partId,
+        issue: repairWorkflow.issue,
+      });
+
+      setRepairWorkflow(null);
+      setCurrentStepChecked(false);
+    } finally {
+      setIsSigningOff(false);
+    }
+  };
+
   return (
     <div className="relative min-h-screen bg-black text-white">
       <div ref={arContainerRef} className="fixed inset-0 z-[1000] h-screen w-screen overflow-hidden bg-black" />
+
+      {isEngineerView && (
+        <div
+          className="pointer-events-none fixed left-1/2 top-1/2 z-[1001] h-[min(36vw,220px)] w-[min(36vw,220px)] -translate-x-1/2 -translate-y-1/2 rounded-[24px] border-2 border-white/80"
+          style={{ boxShadow: "0 0 0 9999px rgba(7, 10, 15, 0.34)" }}
+        >
+          <div className="absolute inset-4 rounded-[18px] border border-white/20" />
+        </div>
+      )}
 
       <div className="pointer-events-none fixed inset-x-0 top-0 z-[1002] p-4">
         <div className="pointer-events-auto mx-auto flex w-full max-w-6xl items-center gap-3 rounded-2xl border border-white/15 bg-black/55 px-4 py-3 backdrop-blur">
@@ -146,139 +318,132 @@ export function TrackingView({
             <p className="font-semibold">Live Issue Tracker</p>
             <p className="text-white/80">{trackingMessage}</p>
           </div>
-
-          {!isManagerView && (
-            <label className="inline-flex items-center gap-2 text-xs sm:text-sm">
-              <input
-                type="checkbox"
-                checked={showDetectedOnly}
-                onChange={(event) => onToggleShowDetectedOnly(event.target.checked)}
-              />
-              Show detected only
-            </label>
-          )}
         </div>
       </div>
 
-      {!isManagerView && (
-        <div className="pointer-events-none fixed right-4 top-24 z-[1003] w-[min(420px,calc(100vw-2rem))] max-h-[calc(100vh-10rem)] overflow-auto rounded-2xl border border-white/15 bg-black/55 p-4 shadow-2xl backdrop-blur">
+      {isEngineerView && !repairWorkflow && (
+        <div className="pointer-events-none fixed right-4 top-24 z-[1003] w-[min(360px,calc(100vw-2rem))] rounded-2xl border border-white/15 bg-black/55 p-4 shadow-2xl backdrop-blur">
           <div className="pointer-events-auto space-y-3">
             <div>
-              <p className="text-sm font-semibold text-white">Detected Part Issues</p>
+              <p className="text-sm font-semibold text-white">AR Engineer Workflow</p>
               <p className="text-xs text-white/70">
-                Mechanics get repair or replacement guidance for the markers currently in view.
+                Aim the helper at a part marker, then choose that part to log an issue or start a guided fix.
               </p>
             </div>
 
-            {mechanicVisibleParts.length === 0 && (
+            {aimedPart ? (
+              <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-sm text-white">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">{aimedPart.name}</p>
+                    <p className="text-xs text-white/70">Marker {aimedPart.markerCode} · {aimedPart.conditionLabel} · {aimedPart.lifecycleLabel}</p>
+                  </div>
+                  <span className="rounded-full border border-emerald-300/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-emerald-100">
+                    In aim
+                  </span>
+                </div>
+                <div className="mt-3 text-xs text-white/80">
+                  {aimedPart.activeIssues.length > 0
+                    ? `${aimedPart.activeIssues.length} active issue${aimedPart.activeIssues.length === 1 ? "" : "s"} available for guided repair.`
+                    : "No active issues yet. Log a new issue from the action menu."}
+                </div>
+              </div>
+            ) : (
               <div className="rounded-xl border border-white/10 bg-black/35 p-4 text-sm text-white/75">
-                No bus parts are visible with the current filter. Point the camera at a part marker or disable the detected-only filter.
+                No part is currently centered in the aim helper.
               </div>
             )}
 
-            {mechanicVisibleParts.map((part) => {
-              const isDetected = detectedMarkerIds.has(part.markerCode);
-
-              return (
-                <div key={part.id} className={`rounded-xl p-4 text-sm text-white ${isDetected ? "border border-emerald-400/30 bg-emerald-500/10" : "border border-white/10 bg-black/35"}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold">{part.name}</p>
-                        {isDetected && (
-                          <span className="rounded-full border border-emerald-300/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-emerald-100">
-                            In view
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-white/70">Marker {part.markerCode} · {part.status} · {part.healthPercent}% health</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 space-y-2">
-                    {part.activeIssues.length === 0 ? (
-                      <div className="rounded-lg border border-white/10 bg-black/25 p-3 text-xs text-white/70">
-                        No active issues are linked to this part.
-                      </div>
-                    ) : (
-                      part.activeIssues.slice(0, 3).map((issue) => {
-                        const availableTools = issue.guide.requiredToolTypes.filter((toolType) =>
-                          tools.some((tool) => tool.name === toolType),
-                        );
-
-                        return (
-                          <div key={issue.id} className="rounded-lg border border-white/10 bg-black/25 p-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="font-medium text-white">{issue.title}</p>
-                              <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${getPriorityClass(issue.priority)}`}>
-                                {issue.priority}
-                              </span>
-                              <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${getStatusClass(issue.status)}`}>
-                                {issue.status.replaceAll("_", " ")}
-                              </span>
-                              <span className="rounded-full border border-sky-400/40 bg-sky-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-sky-100">
-                                {issue.recommendedAction}
-                              </span>
-                            </div>
-                            <p className="mt-2 text-xs text-sky-100/90">Type: {issue.issueTypeLabel}</p>
-                            {issue.assignedToName && (
-                              <p className="mt-1 text-xs text-white/70">Assigned to: {issue.assignedToName}</p>
-                            )}
-                            {issue.description && <p className="mt-2 text-xs text-white/75">{issue.description}</p>}
-                            {issue.latestComment && (
-                              <p className="mt-2 text-xs text-sky-100/90">Latest note: {issue.latestComment}</p>
-                            )}
-                            <div className="mt-3 rounded-lg border border-white/10 bg-black/30 p-3">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-white/70">{issue.guide.title}</p>
-                              <ol className="mt-2 space-y-1 text-xs text-white/80">
-                                {issue.guide.steps.slice(0, 4).map((step, index) => (
-                                  <li key={`${issue.id}-step-${index}`}>{index + 1}. {step}</li>
-                                ))}
-                              </ol>
-                              <p className="mt-3 text-[11px] text-white/65">
-                                Required tools: {issue.guide.requiredToolTypes.join(", ") || "General inspection kit"}
-                              </p>
-                              <p className="text-[11px] text-emerald-100/80">
-                                Available in depot: {availableTools.join(", ") || "No tracked depot tools matched"}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-
-            <div className="pt-2">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-sm font-semibold text-white">Depot Tools</p>
-                <p className="text-xs text-white/65">Tracked regardless of selected bus</p>
-              </div>
-              <div className="space-y-2">
-                {visibleTools.map((tool) => (
-                  <div key={tool.id} className="rounded-xl border border-white/10 bg-black/35 p-3 text-sm text-white">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold">{tool.name}</p>
-                          {detectedMarkerIds.has(tool.markerCode) && (
-                            <span className="rounded-full border border-sky-300/40 bg-sky-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-sky-100">
-                              In view
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-white/70">Marker {tool.markerCode} · {tool.depotName}</p>
-                      </div>
-                      <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${getToolStatusClass(tool.status)}`}>
-                        {tool.status.replaceAll("_", " ")}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div className="rounded-xl border border-white/10 bg-black/35 p-3 text-xs text-white/75">
+              <p className="font-semibold text-white">Detected tools</p>
+              <p className="mt-1">{detectedTools.length > 0 ? detectedTools.map((tool) => tool.name).join(", ") : "No tool markers detected yet."}</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {repairWorkflow && (
+        <div className="pointer-events-none fixed right-4 top-24 z-[1003] w-[min(360px,calc(100vw-2rem))] rounded-2xl border border-white/15 bg-black/60 p-4 shadow-2xl backdrop-blur">
+          <div className="pointer-events-auto space-y-3 text-sm text-white">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold">{repairWorkflow.partName}</p>
+                <p className="text-xs text-white/70">{repairWorkflow.issue.title}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setRepairWorkflow(null);
+                  setCurrentStepChecked(false);
+                }}
+                className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/80"
+              >
+                Cancel
+              </button>
+            </div>
+
+            {!repairWorkflow.toolsConfirmed ? (
+              <div className="space-y-2 rounded-xl border border-white/10 bg-black/35 p-3">
+                <p className="font-semibold text-white">Find required tools</p>
+                <ul className="space-y-2 text-xs text-white/80">
+                  {(repairWorkflow.guide.requiredToolTypes || []).map((toolName) => {
+                    const found = (repairWorkflow.foundToolTypes || []).includes(toolName);
+
+                    return (
+                      <li key={toolName} className={`rounded-lg border px-3 py-2 ${found ? "border-emerald-300/30 bg-emerald-500/10 text-emerald-100 line-through" : "border-white/10 bg-black/20"}`}>
+                        {toolName}
+                      </li>
+                    );
+                  })}
+                </ul>
+                {repairWorkflow.guide.requiredToolTypes.length === 0 && (
+                  <p className="text-xs text-white/70">No tracked tools are required for this guide.</p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3 rounded-xl border border-white/10 bg-black/35 p-3">
+                <p className="font-semibold text-white">{repairWorkflow.guide.title}</p>
+                {currentWorkflowStep ? (
+                  <>
+                    <p className="text-xs text-white/70">Step {repairWorkflow.currentStepIndex + 1} of {Math.max(workflowSteps.length, 1)}</p>
+                    <label className="flex items-start gap-3 rounded-lg border border-white/10 bg-black/25 p-3 text-xs text-white/85">
+                      <input
+                        type="checkbox"
+                        checked={currentStepChecked}
+                        onChange={(event) => setCurrentStepChecked(event.target.checked)}
+                        className="mt-0.5"
+                      />
+                      <span>{currentWorkflowStep}</span>
+                    </label>
+                  </>
+                ) : (
+                  <p className="text-xs text-white/80">All repair steps are complete. Sign off to update the part status.</p>
+                )}
+
+                <div className="flex justify-end gap-2">
+                  {currentWorkflowStep && currentStepChecked && repairWorkflow.currentStepIndex < workflowSteps.length - 1 && (
+                    <button
+                      type="button"
+                      onClick={handleNextStep}
+                      className="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
+                    >
+                      Next
+                    </button>
+                  )}
+
+                  {(!currentWorkflowStep || (currentStepChecked && repairWorkflow.currentStepIndex === workflowSteps.length - 1)) && (
+                    <button
+                      type="button"
+                      onClick={handleSignOff}
+                      disabled={isSigningOff}
+                      className="rounded-md bg-emerald-500 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isSigningOff ? "Signing off..." : "Sign-off"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -288,15 +453,10 @@ export function TrackingView({
         style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
       >
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          {!isManagerView && (
+          {isEngineerView && (
             <div className="pointer-events-auto rounded-xl border border-white/20 bg-black/60 p-4 text-sm backdrop-blur sm:w-[min(460px,calc(100%-2rem))]">
-              <p className="font-bold">Legend</p>
-              <p className="mt-1">
-                <span className="font-semibold text-emerald-300">Green</span>: bus part currently detected
-              </p>
-              <p>
-                <span className="font-semibold text-sky-300">Blue</span>: depot tool currently detected
-              </p>
+              <p className="font-bold">Engineer AR Mode</p>
+              <p className="mt-1 text-white/80">Use the transparent center square to target a part marker, then open the action menu.</p>
             </div>
           )}
 
@@ -308,6 +468,17 @@ export function TrackingView({
               className="pointer-events-auto ml-auto rounded-full bg-primary px-6 py-4 text-sm font-semibold text-primary-foreground shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
             >
               {detectedPartMarkers.length > 0 ? "Report Issue" : reportButtonLabel}
+            </button>
+          )}
+
+          {isEngineerView && (
+            <button
+              type="button"
+              onClick={openEngineerActionPopup}
+              disabled={!aimedPart}
+              className="pointer-events-auto ml-auto rounded-full bg-primary px-6 py-4 text-sm font-semibold uppercase tracking-wide text-primary-foreground shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {aimedPart ? "Choose This Part" : choosePartLabel}
             </button>
           )}
         </div>
@@ -404,6 +575,137 @@ export function TrackingView({
                 className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isSubmitting ? "Saving..." : "Create Issue"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isEngineerActionOpen && (
+        <div className="fixed inset-0 z-[1005] overflow-y-auto bg-black/70 p-4">
+          <div className="mx-auto mt-4 w-full max-w-md rounded-xl border border-border bg-card p-4 text-foreground shadow-xl sm:mt-10">
+            <h3 className="text-lg font-bold">Choose Action For {selectedPart?.name}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Log a new issue or start a guided repair/replacement for the part currently in the aim helper.
+            </p>
+
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setEngineerActionMode("issue")}
+                className={`flex-1 rounded-md border px-3 py-2 text-sm font-semibold ${engineerActionMode === "issue" ? "border-primary bg-primary/10 text-primary" : "border-border bg-background"}`}
+              >
+                Log Issue
+              </button>
+              <button
+                type="button"
+                onClick={() => setEngineerActionMode("fix")}
+                disabled={!selectedPart || selectedPart.activeIssues.length === 0}
+                className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Fix
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {engineerActionMode === "issue" ? (
+                <>
+                  <select
+                    value={selectedIssueType?.id || ""}
+                    onChange={(event) => setSelectedIssueTypeId(event.target.value)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    {(selectedPart?.issueTypeOptions || []).map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label} · {option.recommendedAction} · {option.priority}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={selectedAssigneeId}
+                    onChange={(event) => setSelectedAssigneeId(event.target.value)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">Unassigned</option>
+                    {assignableUsers.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} · {user.role}
+                      </option>
+                    ))}
+                  </select>
+
+                  {selectedIssueType && (
+                    <div className="rounded-lg border border-border bg-background/60 p-3 text-sm">
+                      <p className="font-semibold text-foreground">{selectedIssueType.label}</p>
+                      <p className="mt-1 text-muted-foreground">{selectedIssueType.summary}</p>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Guide: {selectedIssueType.guide.title} · {selectedIssueType.guide.recommendedAction}
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {selectedPart?.activeIssues.length > 0 ? (
+                    <>
+                      <select
+                        value={selectedRepairIssue?.id || ""}
+                        onChange={(event) => setSelectedRepairIssueId(event.target.value)}
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      >
+                        {selectedPart.activeIssues.map((issue) => (
+                          <option key={issue.id} value={issue.id}>
+                            {issue.title} · {issue.recommendedAction} · {issue.status}
+                          </option>
+                        ))}
+                      </select>
+
+                      {selectedRepairIssue && (
+                        <div className="rounded-lg border border-border bg-background/60 p-3 text-sm">
+                          <p className="font-semibold text-foreground">{selectedRepairIssue.title}</p>
+                          <p className="mt-1 text-muted-foreground">{selectedRepairIssue.description || selectedRepairIssue.issueTypeLabel}</p>
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            Guide: {selectedRepairIssue.guide.title}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Tools: {selectedRepairIssue.guide.requiredToolTypes.join(", ") || "No tracked tools required"}
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="rounded-lg border border-border bg-background/60 p-3 text-sm text-muted-foreground">
+                      There are no active issues on this part to repair yet. Log a new issue first.
+                    </div>
+                  )}
+                </>
+              )}
+
+              <textarea
+                value={issueNote}
+                onChange={(event) => setIssueNote(event.target.value)}
+                placeholder="Add an initial note (optional)"
+                rows={3}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div className="sticky bottom-0 mt-4 flex justify-end gap-2 bg-card pt-2">
+              <button
+                type="button"
+                onClick={() => setIsEngineerActionOpen(false)}
+                className="rounded-md border border-border bg-background px-3 py-2 text-sm font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={engineerActionMode === "issue" ? handleEngineerIssueSubmit : handleEngineerFixStart}
+                disabled={engineerActionMode === "issue" ? (!selectedPart || !selectedIssueType || isSubmitting) : (!selectedPart || !selectedRepairIssue || isSubmitting)}
+                className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isSubmitting ? "Saving..." : engineerActionMode === "issue" ? "Create Issue" : "Load Fix Instructions"}
               </button>
             </div>
           </div>

@@ -70,8 +70,8 @@ exports.getSummaryData = async () => {
     createdCompletedData,
     priorityData,
     onTimeOverdueData: [
-      { name: "On Time", value: onTimeCount },
-      { name: "Overdue", value: stats.overdue }
+      { name: "On Time Jobs", value: onTimeCount },
+      { name: "Jobs Overdue", value: stats.overdue }
     ],
     jobsByStatusData
   };

@@ -29,6 +29,8 @@ const depotOptions = [
   "Depot 6",
 ];
 
+const USER_CHANGED_EVENT = "transitlens:user-changed";
+
 const Settings = () => {
   const navigate = useNavigate();
 
@@ -67,6 +69,7 @@ const Settings = () => {
     };
 
     localStorage.setItem("user", JSON.stringify(updatedUser));
+    window.dispatchEvent(new Event(USER_CHANGED_EVENT));
   };
 
   const handleSaveNotifications = () => {
@@ -95,6 +98,7 @@ const Settings = () => {
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    window.dispatchEvent(new Event(USER_CHANGED_EVENT));
     navigate("/");
   };
 

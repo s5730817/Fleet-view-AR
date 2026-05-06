@@ -1,14 +1,18 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { getBusById, addMaintenanceEntry } from "@/lib/api";
-import { getDaysAgo, getDaysUntil } from "@/lib/dateUtils";
-import type { BusComponent, MaintenanceEntry } from "@/types/fleet";
-import { BusStatusBadge } from "@/components/StatusBadge";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getBusById, addMaintenanceEntry, addFaultUpdate, createFault, getBusARContext } from "@/lib/api";
+import { getDaysAgo } from "@/lib/dateUtils";
+import type { ARBusPart, BusComponent, MaintenanceEntry } from "@/types/fleet";
+import { usePermission } from "@/context/PermissionContext";
+import {
+  BusStatusBadge,
+} from "@/components/StatusBadge";
 import { ComponentCard } from "@/components/ComponentCard";
 import { ARView } from "@/components/ARView";
 import { HistoryModal } from "@/components/HistoryModal";
 import { MaintenanceLogModal } from "@/components/MaintenanceLogModal";
+import { IssueLogModal } from "@/components/IssueLogModal";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
@@ -19,28 +23,31 @@ import {
   Eye,
 } from "lucide-react";
 
+type MaintenanceEntryDraft = Omit<MaintenanceEntry, "id">;
+
 const BusDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { hasPermission } = usePermission();
   const location = useLocation();
   const backPath = location.state?.from || "/dashboard";
-  const { data: busData, isLoading, error } = useQuery({
+  const { data: busData, isLoading, error, refetch } = useQuery({
     queryKey: ["bus", id],
     queryFn: () => getBusById(id!),
     enabled: !!id,
+  });
+  const { data: arContext, refetch: refetchArContext } = useQuery({
+    queryKey: ["bus-ar-context", id],
+    queryFn: () => getBusARContext(id!),
+    enabled: !!id && hasPermission("create"),
   });
 
   const [arOpen, setArOpen] = useState(false);
   const [historyComponent, setHistoryComponent] =
     useState<BusComponent | null>(null);
   const [logComponent, setLogComponent] = useState<BusComponent | null>(null);
-  const [components, setComponents] = useState<BusComponent[]>([]);
-
-  useEffect(() => {
-    if (busData) {
-      setComponents(busData.components);
-    }
-  }, [busData]);
+  const [issueComponent, setIssueComponent] = useState<BusComponent | null>(null);
 
   if (isLoading) {
     return (
@@ -77,33 +84,75 @@ const BusDetail = () => {
     );
   }
 
-  const bus = { ...busData, components };
-  const daysUntilService = getDaysUntil(bus.nextServiceDate);
+  const bus = busData;
 
   const handleLogSubmit = async (
     componentId: string,
-    entry: MaintenanceEntry
+    entry: MaintenanceEntryDraft
   ) => {
+    await addMaintenanceEntry(bus.id, componentId, entry);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["bus", id] }),
+      queryClient.invalidateQueries({ queryKey: ["fleet"] }),
+    ]);
+    await refetch();
+  };
+
+  const getStoredUser = () => {
     try {
-      const savedEntry = await addMaintenanceEntry(bus.id, componentId, entry);
-
-      setComponents((prev) =>
-        prev.map((comp) =>
-          comp.id === componentId
-            ? { ...comp, history: [savedEntry, ...comp.history] }
-            : comp
-        )
-      );
-
-      setHistoryComponent((prev) =>
-        prev?.id === componentId
-          ? { ...prev, history: [savedEntry, ...prev.history] }
-          : prev
-      );
-    } catch (err) {
-      console.error("Failed to save maintenance entry:", err);
+      return JSON.parse(window.localStorage.getItem("user") || "{}");
+    } catch {
+      return {};
     }
   };
+
+  const handleIssueSubmit = async (
+    componentId: string,
+    input: { issueTypeId: string; assignedUserId?: string; note?: string }
+  ) => {
+    const issuePart = arContext?.parts.find((part) => part.id === componentId);
+
+    if (!issuePart) {
+      throw new Error("Issue metadata for this component is unavailable");
+    }
+
+    const issueType = issuePart.issueTypeOptions.find((option) => option.id === input.issueTypeId);
+
+    if (!issueType) {
+      throw new Error("Choose an issue type before creating the issue");
+    }
+
+    const storedUser = getStoredUser();
+    const createdIssue = await createFault({
+      title: `${issuePart.name}: ${issueType.label}`,
+      description: `${issueType.summary}\n\nBus: ${bus.name} (${bus.plateNumber})\nPart marker: ${issuePart.markerCode}`,
+      priority: issueType.priority,
+      bus_part_id: componentId,
+      issue_type_id: issueType.id,
+      created_by: storedUser.id || undefined,
+      assigned_user_id: input.assignedUserId || undefined,
+      source: "admin_panel",
+    });
+
+    if (input.note?.trim()) {
+      await addFaultUpdate(createdIssue.id, {
+        created_by: storedUser.id || null,
+        update_type: "comment",
+        description: input.note.trim(),
+      });
+    }
+
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["bus", id] }),
+      queryClient.invalidateQueries({ queryKey: ["fleet"] }),
+      queryClient.invalidateQueries({ queryKey: ["bus-ar-context", id] }),
+    ]);
+    await Promise.all([refetch(), refetchArContext()]);
+  };
+
+  const issuePart: ARBusPart | null = issueComponent
+    ? arContext?.parts.find((part) => part.id === issueComponent.id) || null
+    : null;
 
   return (
     <main className="container max-w-6xl px-4 py-6 space-y-6">
@@ -132,7 +181,7 @@ const BusDetail = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 justify-end">
             <BusStatusBadge status={bus.status} />
 
             <Button onClick={() => navigate(`/ar?busId=${bus.id}`, { state: { from: `/bus/${bus.id}` } })}>
@@ -167,21 +216,20 @@ const BusDetail = () => {
         <div className="rounded-lg border bg-card p-3">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
             <Calendar className="h-3.5 w-3.5" />
-            <span className="text-xs">Next Service</span>
+            <span className="text-xs">Routine Maintenance</span>
           </div>
-          <p
-            className={`text-lg font-bold font-mono ${
-              daysUntilService <= 7 ? "text-red-500" : "text-foreground"
-            }`}
-          >
-            {daysUntilService <= 0 ? "Overdue" : `${daysUntilService}d`}
+          <p className="text-sm font-bold text-foreground">
+            {bus.serviceIndicator.label}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {bus.serviceIndicator.dueDate || "No routine maintenance date set"}
           </p>
         </div>
-
-        <div className="rounded-lg border bg-card p-3">
+      
+        <div className="rounded-lg border bg-card p-3 col-span-2 md:col-span-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
             <MapPin className="h-3.5 w-3.5" />
-            <span className="text-xs">Model</span>
+            <span className="text-xs">Vehicle</span>
           </div>
           <p className="text-sm font-bold text-foreground">
             {bus.year} {bus.model}
@@ -195,12 +243,15 @@ const BusDetail = () => {
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {components.map((comp) => (
+          {bus.components.map((comp) => (
             <ComponentCard
               key={comp.id}
               component={comp}
               onOpenHistory={setHistoryComponent}
               onLogMaintenance={setLogComponent}
+              onLogIssue={setIssueComponent}
+              canLogMaintenance={hasPermission("create")}
+              canLogIssue={hasPermission("create") && Boolean(arContext?.parts.find((part) => part.id === comp.id)?.issueTypeOptions.length)}
             />
           ))}
         </div>
@@ -220,6 +271,16 @@ const BusDetail = () => {
         component={logComponent}
         busName={bus.name}
         onLogSubmit={handleLogSubmit}
+      />
+
+      <IssueLogModal
+        open={!!issueComponent}
+        onClose={() => setIssueComponent(null)}
+        component={issueComponent}
+        busName={bus.name}
+        issuePart={issuePart}
+        assignableUsers={arContext?.assignableUsers || []}
+        onIssueSubmit={handleIssueSubmit}
       />
     </main>
   );

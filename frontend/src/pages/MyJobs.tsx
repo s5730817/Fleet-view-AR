@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getJobs } from "@/lib/api";
+import { getDaysUntil, isPastDate } from "@/lib/dateUtils";
 import { ChevronDown } from "lucide-react";
 
 import {
@@ -146,7 +147,8 @@ export default function MyJobs() {
         <div className="space-y-3">
           {sortedJobs.length > 0 ? (
             sortedJobs.map((job) => {
-              const isOverdue = new Date(job.dueDate) < new Date();
+              const isOverdue = isPastDate(job.dueDate);
+              const daysUntilDue = getDaysUntil(job.dueDate);
 
               return (
                 <div
@@ -188,7 +190,11 @@ export default function MyJobs() {
                     <p className="text-sm text-muted-foreground">
                       Due:{" "}
                       <span className="font-medium text-foreground">
-                        {new Date(job.dueDate).toLocaleDateString()}
+                        {daysUntilDue < 0
+                          ? `${new Date(job.dueDate).toLocaleDateString()} (${Math.abs(daysUntilDue)}d overdue)`
+                          : daysUntilDue === 0
+                          ? `${new Date(job.dueDate).toLocaleDateString()} (due today)`
+                          : `${new Date(job.dueDate).toLocaleDateString()} (in ${daysUntilDue}d)`}
                       </span>
                     </p>
                   </div>

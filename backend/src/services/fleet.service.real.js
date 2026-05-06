@@ -1,14 +1,18 @@
 const { randomUUID } = require("crypto");
+const authModel = require("../models/auth.model");
 const fleetModel = require("../models/fleet.model");
 const {
   resolvePartCode
 } = require("../utils/arIssueCatalog");
-
-const componentStatusLabels = {
-  good: "Good",
-  due_soon: "Due Soon",
-  urgent: "Urgent"
-};
+const {
+  COMPONENT_INDICATOR_LABELS,
+  COMPONENT_STATUS_LABELS,
+  deriveComponentPresentation,
+  deriveBusMaintenanceSummary,
+  LIFECYCLE_LABELS,
+  normalizeLifecycleState,
+  normalizeComponentState
+} = require("../utils/maintenanceStatus");
 
 const formatDate = (value) => {
   if (!value) {
@@ -36,42 +40,118 @@ const mapIssueHistoryEntry = (entry) => ({
   notes: null
 });
 
-const mapPart = (part, entriesByPartId) => ({
-  id: part.id,
-  code: resolvePartCode(part.name, part.icon_key),
-  name: part.name,
-  markerCode: part.marker_code,
-  icon: part.icon_key || "Wrench",
-  status: componentStatusLabels[part.status] || part.status || "Good",
-  lastRepair: formatDate(part.last_repair_at),
-  lastService: formatDate(part.last_service_at),
-  lastReplacement: formatDate(part.last_replacement_at),
-  healthPercent: part.health_percent ?? 0,
-  history: entriesByPartId.get(part.id) || [],
-  arInstructions: Array.isArray(part.ar_instructions) ? part.ar_instructions : []
-});
+const resolveUserScope = async (user) => {
+  const fallbackRole = typeof user?.role === "string" ? user.role.trim().toLowerCase() : null;
 
-const mapBus = (bus, partsByBusId, entriesByPartId) => ({
-  id: bus.id,
-  name: bus.name,
-  depotId: bus.depot_id || null,
-  depotName: bus.depot_name || null,
-  plateNumber: bus.registration_number,
-  status: bus.status || "Operational",
-  mileage: bus.mileage ?? 0,
-  lastServiceDate: formatDate(bus.last_service_at),
-  nextServiceDate: formatDate(bus.next_service_at),
-  year: bus.year ?? new Date().getFullYear(),
-  model: bus.model || "Unknown",
-  components: (partsByBusId.get(bus.id) || []).map((part) => mapPart(part, entriesByPartId))
-});
+  if (fallbackRole === "admin") {
+    return {
+      role: "admin",
+      depotId: null,
+      restrictToDepot: false
+    };
+  }
+
+  if (!user?.id) {
+    return {
+      role: fallbackRole,
+      depotId: null,
+      restrictToDepot: fallbackRole !== "admin"
+    };
+  }
+
+  const persistedUser = await authModel.getUserById(user.id);
+  const role = typeof persistedUser?.role === "string"
+    ? persistedUser.role.trim().toLowerCase()
+    : fallbackRole;
+
+  return {
+    role,
+    depotId: persistedUser?.depot_id || null,
+    restrictToDepot: role !== "admin"
+  };
+};
+
+const mapPart = (part, entriesByPartId, issuesByPartId, policyByPartCode) => {
+  const partCode = resolvePartCode(part.name, part.icon_key);
+  const activeIssues = issuesByPartId.get(part.id) || [];
+  const lifecyclePolicy = policyByPartCode.get(partCode) || null;
+  const presentation = deriveComponentPresentation({
+    conditionState: part.condition_state,
+    lifecycleState: part.lifecycle_state,
+    issues: activeIssues,
+    lastInspectedAt: part.last_inspected_at,
+    inspectionIntervalDays: lifecyclePolicy?.usage_model === "inspection"
+      ? lifecyclePolicy.inspection_interval_days ?? null
+      : null
+  });
+  const normalizedState = normalizeComponentState({
+    conditionState: part.condition_state
+  });
+  const normalizedLifecycleState = normalizeLifecycleState({
+    lifecycleState: part.lifecycle_state
+  });
+
+  return {
+    id: part.id,
+    code: partCode,
+    name: part.name,
+    markerCode: part.marker_code,
+    icon: part.icon_key || "Wrench",
+    status: presentation.status,
+    statusState: presentation.statusState,
+    statusNote: presentation.statusNote,
+    conditionState: normalizedState,
+    conditionLabel: COMPONENT_STATUS_LABELS[normalizedState] || COMPONENT_INDICATOR_LABELS[normalizedState],
+    lifecycleState: normalizedLifecycleState,
+    lifecycleLabel: LIFECYCLE_LABELS[normalizedLifecycleState],
+    maintenanceIndicator: presentation.maintenanceIndicator,
+    activeIssueCount: presentation.activeIssueCount,
+    inProgressIssueCount: presentation.inProgressIssueCount,
+    lastRepair: formatDate(part.last_repair_at),
+    lastInspected: formatDate(part.last_inspected_at),
+    lastService: formatDate(part.last_service_at),
+    lastReplacement: formatDate(part.last_replacement_at),
+    history: entriesByPartId.get(part.id) || [],
+    arInstructions: Array.isArray(part.ar_instructions) ? part.ar_instructions : []
+  };
+};
+
+const mapBus = (bus, partsByBusId, entriesByPartId, issuesByPartId, policyByPartCode, issues) => {
+  const mappedParts = (partsByBusId.get(bus.id) || []).map((part) => mapPart(part, entriesByPartId, issuesByPartId, policyByPartCode));
+  const maintenanceSummary = deriveBusMaintenanceSummary({
+    nextServiceAt: bus.next_service_at,
+    issues,
+    components: mappedParts
+  });
+
+  return {
+    id: bus.id,
+    name: bus.name,
+    depotId: bus.depot_id || null,
+    depotName: bus.depot_name || null,
+    plateNumber: bus.registration_number,
+    status: maintenanceSummary.status,
+    mileage: bus.mileage ?? 0,
+    lastServiceDate: formatDate(bus.last_service_at),
+    nextServiceDate: formatDate(bus.next_service_at),
+    year: bus.year ?? new Date().getFullYear(),
+    model: bus.model || "Unknown",
+    issueIndicator: maintenanceSummary.issueIndicator,
+    componentIndicator: maintenanceSummary.componentIndicator,
+    serviceIndicator: maintenanceSummary.serviceIndicator,
+    components: mappedParts
+  };
+};
 
 const hydrateBuses = async (buses) => {
   const busIds = buses.map((bus) => bus.id);
   const parts = await fleetModel.getPartsForBusIds(busIds);
+  const policyPartCodes = [...new Set(parts.map((part) => resolvePartCode(part.name, part.icon_key)).filter(Boolean))];
+  const lifecyclePolicies = await fleetModel.getLifecyclePoliciesForPartCodes(policyPartCodes);
   const partIds = parts.map((part) => part.id);
   const maintenanceEntries = await fleetModel.getMaintenanceEntriesForPartIds(partIds);
   const issueHistoryEntries = await fleetModel.getIssueHistoryForPartIds(partIds);
+  const issues = await fleetModel.getIssuesForPartIds(partIds);
 
   const partsByBusId = new Map();
   for (const part of parts) {
@@ -79,6 +159,26 @@ const hydrateBuses = async (buses) => {
     busParts.push(part);
     partsByBusId.set(part.bus_id, busParts);
   }
+
+  const busIdByPartId = new Map(parts.map((part) => [part.id, part.bus_id]));
+  const issuesByBusId = new Map();
+  const issuesByPartId = new Map();
+  for (const issue of issues) {
+    const busId = busIdByPartId.get(issue.bus_part_id);
+    if (!busId) {
+      continue;
+    }
+
+    const busIssues = issuesByBusId.get(busId) || [];
+    busIssues.push(issue);
+    issuesByBusId.set(busId, busIssues);
+
+    const partIssues = issuesByPartId.get(issue.bus_part_id) || [];
+    partIssues.push(issue);
+    issuesByPartId.set(issue.bus_part_id, partIssues);
+  }
+
+  const policyByPartCode = new Map(lifecyclePolicies.map((policy) => [policy.part_code, policy]));
 
   const entriesByPartId = new Map();
   for (const entry of maintenanceEntries) {
@@ -94,16 +194,37 @@ const hydrateBuses = async (buses) => {
     entriesByPartId.set(entry.bus_part_id, history);
   }
 
-  return buses.map((bus) => mapBus(bus, partsByBusId, entriesByPartId));
+  return buses.map((bus) => mapBus(
+    bus,
+    partsByBusId,
+    entriesByPartId,
+    issuesByPartId,
+    policyByPartCode,
+    issuesByBusId.get(bus.id) || []
+  ));
 };
 
-exports.getAllBuses = async () => {
-  const buses = await fleetModel.getAllBuses();
+exports.getAllBuses = async (user) => {
+  const scope = await resolveUserScope(user);
+  if (scope.restrictToDepot && !scope.depotId) {
+    return [];
+  }
+
+  const buses = await fleetModel.getAllBuses({
+    depotId: scope.restrictToDepot ? scope.depotId : null
+  });
   return hydrateBuses(buses);
 };
 
-exports.getBusById = async (id) => {
-  const bus = await fleetModel.getBusById(id);
+exports.getBusById = async (id, user) => {
+  const scope = await resolveUserScope(user);
+  if (scope.restrictToDepot && !scope.depotId) {
+    return null;
+  }
+
+  const bus = await fleetModel.getBusById(id, {
+    depotId: scope.restrictToDepot ? scope.depotId : null
+  });
 
   if (!bus) {
     return null;
@@ -113,8 +234,15 @@ exports.getBusById = async (id) => {
   return hydratedBus || null;
 };
 
-exports.getARContext = async (id) => {
-  const bus = await fleetModel.getBusById(id);
+exports.getARContext = async (id, user) => {
+  const scope = await resolveUserScope(user);
+  if (scope.restrictToDepot && !scope.depotId) {
+    return null;
+  }
+
+  const bus = await fleetModel.getBusById(id, {
+    depotId: scope.restrictToDepot ? scope.depotId : null
+  });
 
   if (!bus) {
     return null;
@@ -125,8 +253,11 @@ exports.getARContext = async (id) => {
   const partIds = parts.map((part) => part.id);
   const issues = await fleetModel.getIssuesForPartIds(partIds);
   const issueTypes = await fleetModel.getIssueTypesForPartCodes(partCodes);
+  const lifecyclePolicies = await fleetModel.getLifecyclePoliciesForPartCodes(partCodes);
   const tools = await fleetModel.getToolsForDepot(bus.depot_id);
-  const assignableUsers = await fleetModel.getAssignableUsersForDepot(bus.depot_id);
+  const assignableUsers = await fleetModel.getAssignableUsersForDepot(
+    scope.role === "admin" ? null : bus.depot_id
+  );
 
   const buildGuideFromIssueType = (issueType, partInstructions = []) => ({
     title: issueType?.guide_title || "Inspection Guide",
@@ -151,6 +282,8 @@ exports.getARContext = async (id) => {
     issuesByPartId.set(issue.bus_part_id, partIssues);
   }
 
+  const policyByPartCode = new Map(lifecyclePolicies.map((policy) => [policy.part_code, policy]));
+
   return {
     bus: {
       id: bus.id,
@@ -158,7 +291,14 @@ exports.getARContext = async (id) => {
       plateNumber: bus.registration_number,
       depotId: bus.depot_id || null,
       depotName: bus.depot_name || null,
-      status: bus.status || "Operational"
+      status: deriveBusMaintenanceSummary({
+        nextServiceAt: bus.next_service_at,
+        issues,
+        components: parts.map((part) => ({
+          conditionState: part.condition_state,
+          lifecycleState: part.lifecycle_state
+        }))
+      }).status
     },
     parts: parts.map((part) => {
       const partCode = resolvePartCode(part.name, part.icon_key);
@@ -182,8 +322,27 @@ exports.getARContext = async (id) => {
         name: part.name,
         markerCode: part.marker_code,
         icon: part.icon_key || "Wrench",
-        status: componentStatusLabels[part.status] || part.status || "Good",
-        healthPercent: part.health_percent ?? 0,
+        status: deriveComponentPresentation({
+          conditionState: part.condition_state,
+          lifecycleState: part.lifecycle_state,
+          issues: issuesByPartId.get(part.id) || [],
+          lastInspectedAt: part.last_inspected_at,
+          inspectionIntervalDays: policyByPartCode.get(partCode)?.usage_model === "inspection"
+            ? policyByPartCode.get(partCode)?.inspection_interval_days ?? null
+            : null
+        }).status,
+        conditionState: normalizeComponentState({
+          conditionState: part.condition_state
+        }),
+        conditionLabel: COMPONENT_STATUS_LABELS[normalizeComponentState({
+          conditionState: part.condition_state
+        })] || "Good",
+        lifecycleState: normalizeLifecycleState({
+          lifecycleState: part.lifecycle_state
+        }),
+        lifecycleLabel: LIFECYCLE_LABELS[normalizeLifecycleState({
+          lifecycleState: part.lifecycle_state
+        })],
         arInstructions: partInstructions,
         issueTypeOptions,
         activeIssues: (issuesByPartId.get(part.id) || []).map((issue) => {
@@ -232,8 +391,15 @@ exports.getARContext = async (id) => {
   };
 };
 
-exports.addMaintenanceEntry = async (busId, componentId, body) => {
-  const bus = await fleetModel.getBusById(busId);
+exports.addMaintenanceEntry = async (busId, componentId, body, user) => {
+  const scope = await resolveUserScope(user);
+  if (scope.restrictToDepot && !scope.depotId) {
+    return null;
+  }
+
+  const bus = await fleetModel.getBusById(busId, {
+    depotId: scope.restrictToDepot ? scope.depotId : null
+  });
 
   if (!bus) {
     return null;
@@ -258,14 +424,25 @@ exports.addMaintenanceEntry = async (busId, componentId, body) => {
     throw new Error("Technician is required");
   }
 
-  const entry = await fleetModel.createMaintenanceEntry({
-    id: body.id || randomUUID(),
-    bus_part_id: componentId,
-    user_id: body.user_id || null,
-    technician_name: body.technician,
-    entry_type: body.type,
-    description: body.description,
-    notes: body.notes || null
+  const entry = await require("../database/db").withTransaction(async (client) => {
+    const createdEntry = await fleetModel.createMaintenanceEntry({
+      id: randomUUID(),
+      bus_part_id: componentId,
+      user_id: body.user_id || null,
+      technician_name: body.technician,
+      entry_type: body.type,
+      description: body.description,
+      notes: body.notes || null
+    }, client);
+
+    await fleetModel.updatePartLifecycleAfterMaintenance(componentId, body.type, client);
+    await fleetModel.resolveActiveIssuesForPart({
+      partId: componentId,
+      createdBy: body.user_id || null,
+      note: `Issue resolved through ${body.type} entry by ${body.technician}`
+    }, client);
+
+    return createdEntry;
   });
 
   return mapMaintenanceEntry(entry);

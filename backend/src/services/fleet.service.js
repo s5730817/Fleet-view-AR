@@ -8,6 +8,19 @@ const {
   getToolMarkerCode,
   getIssueTypeOptionsForPart
 } = require("../utils/arIssueCatalog");
+const {
+  COMPONENT_INDICATOR_LABELS,
+  COMPONENT_STATUS_LABELS,
+  deriveComponentPresentation,
+  deriveBusMaintenanceSummary,
+  LIFECYCLE_LABELS,
+  normalizeComponentState,
+  normalizeLifecycleState
+} = require("../utils/maintenanceStatus");
+const {
+  getRelativeDemoDate,
+  shiftDemoDate
+} = require("../utils/demoTimeline");
 
 const mockAssignableUsersByDepot = {
   1: [
@@ -28,18 +41,116 @@ const mockActorNameMap = {
   system_user: "System"
 };
 
+const routineServiceOffsetsByBusId = {
+  "bus-001": -14,
+  "bus-002": 7,
+  "bus-003": 18,
+  "bus-004": -9,
+  "bus-005": 2,
+  "bus-006": 9,
+  "bus-007": 16,
+  "bus-008": -4,
+  "bus-009": 23,
+  "bus-010": -12,
+  "bus-011": 13,
+  "bus-012": 5,
+  "bus-013": 27,
+  "bus-014": 11,
+  "bus-015": -2,
+  "bus-016": 20,
+  "bus-017": -16,
+  "bus-018": 6
+};
+
+const legacyConditionStateMap = {
+  Good: "good",
+  "Due Soon": "watch",
+  Urgent: "repair_needed"
+};
+
+const legacyLifecycleStateMap = {
+  Good: "within_expected_life",
+  "Due Soon": "near_end_of_life",
+  Urgent: "beyond_expected_life"
+};
+
+const shiftHistoryEntry = (entry) => ({
+  ...entry,
+  date: shiftDemoDate(entry.date)
+});
+
+const normalizeMockComponent = (component) => {
+  const conditionState = normalizeComponentState({
+    conditionState: component.conditionState || legacyConditionStateMap[component.status] || "good"
+  });
+  const lifecycleState = normalizeLifecycleState({
+    lifecycleState: component.lifecycleState || legacyLifecycleStateMap[component.status] || "within_expected_life"
+  });
+  const lastInspected = shiftDemoDate(component.lastService);
+  const presentation = deriveComponentPresentation({
+    conditionState,
+    lifecycleState,
+    issues: [],
+    lastInspectedAt: lastInspected,
+    inspectionIntervalDays: null
+  });
+
+  return {
+    ...component,
+    status: presentation.status,
+    statusState: presentation.statusState,
+    statusNote: presentation.statusNote,
+    conditionState,
+    conditionLabel: COMPONENT_STATUS_LABELS[conditionState] || COMPONENT_INDICATOR_LABELS[conditionState],
+    lifecycleState,
+    lifecycleLabel: LIFECYCLE_LABELS[lifecycleState],
+    maintenanceIndicator: presentation.maintenanceIndicator,
+    activeIssueCount: 0,
+    inProgressIssueCount: 0,
+    lastInspected
+  };
+};
+
+const shiftComponentDates = (component) => normalizeMockComponent({
+  ...component,
+  lastRepair: shiftDemoDate(component.lastRepair),
+  lastService: shiftDemoDate(component.lastService),
+  lastReplacement: shiftDemoDate(component.lastReplacement),
+  history: component.history.map(shiftHistoryEntry)
+});
+
+const shiftBusDates = (bus) => ({
+  ...bus,
+  lastServiceDate: getRelativeDemoDate((routineServiceOffsetsByBusId[bus.id] ?? 14) - 56),
+  nextServiceDate: getRelativeDemoDate(routineServiceOffsetsByBusId[bus.id] ?? 14),
+  components: bus.components.map(shiftComponentDates)
+});
+
+const buildMockIssueSummaryInput = (bus) => {
+  if (bus.status === "Under Repair") {
+    return [{ status: "in_progress" }];
+  }
+
+  if (bus.components.some((component) => component.conditionState === "repair_needed" || component.conditionState === "replace_recommended")) {
+    return [{ status: "reported" }];
+  }
+
+  return [];
+};
+
 const augmentHistoryWithIssues = async (buses) => {
   const faults = await faultService.getAllFaults({});
 
   return Promise.all(
-    buses.map(async (bus) => {
+    buses.map(async (rawBus) => {
+      const bus = shiftBusDates(rawBus);
       const components = await Promise.all(
         bus.components.map(async (component) => {
           const faultHistory = faults
             .filter((fault) => fault.bus_part_id === component.id)
             .map((fault) => ({
               id: `issue:${fault.id}`,
-              date: new Date(fault.created_at).toISOString().slice(0, 10),
+              date: shiftDemoDate(fault.created_at),
               type: "issue",
               description: `Issue logged: ${fault.title}`,
               technician: mockActorNameMap[fault.created_by] || "System",
@@ -53,7 +164,7 @@ const augmentHistoryWithIssues = async (buses) => {
             )
           ).flat().filter(Boolean).map((update) => ({
             id: `update:${update.id}`,
-            date: new Date(update.created_at).toISOString().slice(0, 10),
+            date: shiftDemoDate(update.created_at),
             type: update.update_type,
             description: update.description,
             technician: mockActorNameMap[update.created_by] || "System",
@@ -61,6 +172,13 @@ const augmentHistoryWithIssues = async (buses) => {
 
           return {
             ...component,
+            ...deriveComponentPresentation({
+              conditionState: component.conditionState,
+              lifecycleState: component.lifecycleState,
+              issues: faults.filter((fault) => fault.bus_part_id === component.id),
+              lastInspectedAt: component.lastInspected || component.lastService,
+              inspectionIntervalDays: null
+            }),
             history: [...component.history, ...faultHistory, ...faultUpdates].sort(
               (left, right) => new Date(right.date).getTime() - new Date(left.date).getTime()
             ),
@@ -68,8 +186,18 @@ const augmentHistoryWithIssues = async (buses) => {
         })
       );
 
+      const maintenanceSummary = deriveBusMaintenanceSummary({
+        nextServiceAt: bus.nextServiceDate,
+        issues: buildMockIssueSummaryInput({ ...bus, components }),
+        components
+      });
+
       return {
         ...bus,
+        status: maintenanceSummary.status,
+        issueIndicator: maintenanceSummary.issueIndicator,
+        componentIndicator: maintenanceSummary.componentIndicator,
+        serviceIndicator: maintenanceSummary.serviceIndicator,
         components,
       };
     })
@@ -446,16 +574,22 @@ exports.getARContext = async (id) => {
       plateNumber: bus.plateNumber,
       depotId: `mock-depot-${depotSequence}`,
       depotName,
-      status: bus.status
+      status: deriveBusMaintenanceSummary({
+        nextServiceAt: shiftDemoDate(bus.nextServiceDate),
+        issues: buildMockIssueSummaryInput(bus),
+        components: bus.components.map((component) => ({
+          conditionState: component.conditionState || legacyConditionStateMap[component.status] || "good",
+          lifecycleState: component.lifecycleState || legacyLifecycleStateMap[component.status] || "within_expected_life"
+        }))
+      }).status
     },
     parts: bus.components.map((component, componentIndex) => ({
+      ...normalizeMockComponent(component),
       id: component.id,
       code: component.id,
       name: component.name,
       markerCode: getBusMarkerCode(componentIndex),
       icon: component.icon,
-      status: component.status,
-      healthPercent: component.healthPercent,
       arInstructions: component.arInstructions,
       issueTypeOptions: getIssueTypeOptionsForPart(component.id, component.arInstructions).map((issueType) => ({
         id: `mock:${component.id}:${issueType.key}`,
@@ -503,7 +637,7 @@ exports.addMaintenanceEntry = async (busId, componentId, body) => {
 
   // Create new maintenance entry
   const newEntry = {
-    id: body.id || randomUUID(),
+    id: randomUUID(),
     date: body.date || new Date().toISOString().slice(0, 10),
     type: body.type,
     description: body.description,

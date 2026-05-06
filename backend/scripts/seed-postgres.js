@@ -33,9 +33,26 @@ const toTimestamp = (value) => {
 
 const componentStatusMap = {
   Good: "good",
-  "Due Soon": "due_soon",
-  Urgent: "urgent"
+  "Due Soon": "watch",
+  Urgent: "repair_needed"
 };
+
+const componentLifecycleMap = {
+  Good: "within_expected_life",
+  "Due Soon": "near_end_of_life",
+  Urgent: "beyond_expected_life"
+};
+
+const lifecyclePolicies = [
+  { partCode: "engine", usageModel: "mileage", expectedLifeMileage: 250000, inspectionIntervalDays: 30, replacementRule: "Replace when repeated major failures occur or overhaul threshold is reached." },
+  { partCode: "brakes", usageModel: "mileage", expectedLifeMileage: 60000, inspectionIntervalDays: 14, replacementRule: "Replace when wear limit is reached or braking performance drops below standard." },
+  { partCode: "tires", usageModel: "mileage", expectedLifeMileage: 50000, inspectionIntervalDays: 14, replacementRule: "Replace when tread or sidewall condition fails inspection." },
+  { partCode: "battery", usageModel: "days", expectedLifeDays: 1095, inspectionIntervalDays: 30, replacementRule: "Replace when test results fail or capacity drops below depot threshold." },
+  { partCode: "suspension", usageModel: "inspection", inspectionIntervalDays: 30, replacementRule: "Replace when structural wear or leakage is confirmed." },
+  { partCode: "cooling", usageModel: "inspection", inspectionIntervalDays: 30, replacementRule: "Replace when leak or thermal performance cannot be restored by repair." },
+  { partCode: "transmission", usageModel: "mileage", expectedLifeMileage: 220000, inspectionIntervalDays: 30, replacementRule: "Replace or overhaul when recurring shift faults exceed repair threshold." },
+  { partCode: "electrical", usageModel: "issue_burden", inspectionIntervalDays: 30, replacementRule: "Replace when recurring electrical faults continue after corrective work." }
+];
 
 const jobStatusOverrides = {
   "job-001": "in_progress",
@@ -249,6 +266,40 @@ const run = async () => {
       );
     }
 
+    for (const policy of lifecyclePolicies) {
+      const policyId = stableUuid(`part-policy:${policy.partCode}`);
+      await client.query(
+        `INSERT INTO part_lifecycle_policies (
+          id,
+          part_code,
+          usage_model,
+          expected_life_days,
+          expected_life_mileage,
+          inspection_interval_days,
+          replacement_rule,
+          created_at,
+          updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+        ON CONFLICT (part_code) DO UPDATE
+        SET usage_model = EXCLUDED.usage_model,
+            expected_life_days = EXCLUDED.expected_life_days,
+            expected_life_mileage = EXCLUDED.expected_life_mileage,
+            inspection_interval_days = EXCLUDED.inspection_interval_days,
+            replacement_rule = EXCLUDED.replacement_rule,
+            updated_at = NOW()`,
+        [
+          policyId,
+          policy.partCode,
+          policy.usageModel,
+          policy.expectedLifeDays ?? null,
+          policy.expectedLifeMileage ?? null,
+          policy.inspectionIntervalDays ?? null,
+          policy.replacementRule ?? null
+        ]
+      );
+    }
+
     for (const issueType of getIssueCatalogEntries()) {
       const issueTypeId = stableUuid(`issue-type:${issueType.partCode}:${issueType.key}`);
       issueTypeIdByKey.set(`${issueType.partCode}:${issueType.key}`, issueTypeId);
@@ -374,22 +425,24 @@ const run = async () => {
             name,
             marker_code,
             icon_key,
-            status,
-            health_percent,
+            condition_state,
+            lifecycle_state,
             last_repair_at,
+            last_inspected_at,
             last_service_at,
             last_replacement_at,
             ar_instructions
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb)
           ON CONFLICT (id) DO UPDATE
           SET bus_id = EXCLUDED.bus_id,
               name = EXCLUDED.name,
               marker_code = EXCLUDED.marker_code,
               icon_key = EXCLUDED.icon_key,
-              status = EXCLUDED.status,
-              health_percent = EXCLUDED.health_percent,
+              condition_state = EXCLUDED.condition_state,
+              lifecycle_state = EXCLUDED.lifecycle_state,
               last_repair_at = EXCLUDED.last_repair_at,
+              last_inspected_at = EXCLUDED.last_inspected_at,
               last_service_at = EXCLUDED.last_service_at,
               last_replacement_at = EXCLUDED.last_replacement_at,
               ar_instructions = EXCLUDED.ar_instructions`,
@@ -400,8 +453,9 @@ const run = async () => {
             getBusMarkerCode(componentIndex),
             component.icon,
             componentStatusMap[component.status] || "good",
-            component.healthPercent,
+            componentLifecycleMap[component.status] || "within_expected_life",
             toTimestamp(component.lastRepair),
+            toTimestamp(component.lastService),
             toTimestamp(component.lastService),
             toTimestamp(component.lastReplacement),
             JSON.stringify(component.arInstructions)

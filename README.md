@@ -146,7 +146,7 @@ If you need LAN access, include your machine IP:
 
 ```bash
 cd frontend
-DEV_CERT_HOSTS=localhost,127.0.0.1,::1,192.168.0.109 npm run cert:dev
+DEV_CERT_HOSTS=localhost,127.0.0.1,::1,<LAN-machine-IP> npm run cert:dev
 ```
 
 3. Trust `frontend/ca.crt` on the device you are testing with.
@@ -201,7 +201,7 @@ Current shared part markers:
 - `24` Suspension
 - `25` Cooling System
 - `26` Transmission
-- `27` Electrical Systems
+- `27` Electrical System
 
 Formula:
 
@@ -227,3 +227,5 @@ Current tool markers in each depot:
 7. `506` Battery Tester
 8. `507` Coolant Pressure Tester
 9. `508` Multimeter
+
+See ./markers
