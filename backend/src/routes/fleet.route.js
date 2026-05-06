@@ -7,6 +7,7 @@ const fleetController = require("../controllers/fleet.controller");
 // Import role middleware for permission checks
 const { authoriseRoles } = require("../middleware/role.middleware");
 
+
 // GET all buses in the fleet
 // Accessible to any authenticated user (protected at app level)
 router.get("/", fleetController.getAllBuses);

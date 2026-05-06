@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
+const helmet = require("helmet");
 
 // Import routes
 const faultRoutes = require("./routes/fault.route");
@@ -14,7 +15,15 @@ const app = express();
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(
+  helmet({
+    contentSecurityPolicy: false
+  })
+);
+// 500 kb payload limit
+app.use(express.json({
+  limit: "500kb"
+}));
 app.use(morgan("dev"));
 
 // Auth routes
