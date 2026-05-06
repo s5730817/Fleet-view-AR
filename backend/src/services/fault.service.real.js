@@ -52,6 +52,15 @@ const canAccessPartContext = (scope, partContext) => {
 
 const buildIssueAssigneeUsers = (users) => users.filter((user) => user.role === "engineer");
 
+const getMaintenanceApprovalPayload = (update) => {
+  const metadata = update?.metadata;
+  if (!metadata || metadata.kind !== "maintenance_approval_request") {
+    return null;
+  }
+
+  return metadata.maintenance || null;
+};
+
 // Get dashboard summary for faults
 exports.getFaultSummary = async () => {
   return await faultModel.getFaultSummary();
@@ -206,8 +215,65 @@ exports.updateFaultStatus = async (id, { status }, actor) => {
 
   const oldStatus = existingFault.status;
 
+  const pendingMaintenanceApproval = oldStatus === "awaiting_approval"
+    ? getMaintenanceApprovalPayload(await faultModel.getLatestMaintenanceApprovalRequest(id))
+    : null;
+
+  if (pendingMaintenanceApproval && status === "resolved" && scope.role === "engineer") {
+    throw new Error("A manager or admin must approve this maintenance log");
+  }
+
+  if (pendingMaintenanceApproval && status === "resolved") {
+    const maintenance = pendingMaintenanceApproval;
+    const maintenanceIssueIds = Array.isArray(maintenance.resolvedIssueIds)
+      ? [...new Set(maintenance.resolvedIssueIds.filter((issueId) => typeof issueId === "string" && issueId.trim().length > 0))]
+      : [];
+
+    await db.withTransaction(async (client) => {
+      await fleetModel.createMaintenanceEntry({
+        id: require("crypto").randomUUID(),
+        bus_part_id: existingFault.bus_part_id,
+        user_id: maintenance.technicianUserId || null,
+        technician_name: maintenance.technicianName || "Technician",
+        entry_type: maintenance.entryType,
+        description: maintenance.description,
+        notes: maintenance.notes || null,
+      }, client);
+
+      await fleetModel.updatePartLifecycleAfterMaintenance(existingFault.bus_part_id, maintenance.entryType, client);
+
+      if (maintenanceIssueIds.length > 0) {
+        await fleetModel.resolveActiveIssuesForPart({
+          partId: existingFault.bus_part_id,
+          createdBy: scope.actorId,
+          approvedBy: scope.actorId,
+          note: `Manager approved ${maintenance.entryType} logged by ${maintenance.technicianName || "technician"}`,
+          issueIds: maintenanceIssueIds,
+        }, client);
+      } else {
+        await faultModel.updateFaultStatus(id, status, client, { approvedBy: scope.actorId });
+        await faultModel.createFaultUpdate({
+          id: randomUUID(),
+          issue_id: id,
+          created_by: scope.actorId,
+          update_type: "status_change",
+          description: `Manager approved ${maintenance.entryType} logged by ${maintenance.technicianName || "technician"}`,
+          status_from: oldStatus,
+          status_to: status,
+          new_issue_id: null,
+        }, client);
+      }
+
+      await fleetModel.reconcilePartConditionFromActiveIssues(existingFault.bus_part_id, client);
+    });
+
+    return await faultModel.getFaultById(id);
+  }
+
   await db.withTransaction(async (client) => {
-    await faultModel.updateFaultStatus(id, status, client);
+    await faultModel.updateFaultStatus(id, status, client, {
+      approvedBy: status === "resolved" && scope.role !== "engineer" ? scope.actorId : null,
+    });
 
     await faultModel.createFaultUpdate({
       id: randomUUID(),

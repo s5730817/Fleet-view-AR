@@ -42,8 +42,52 @@ const typeLabel: Record<string, string> = {
   progress: "Progress",
 };
 
+const getHistorySortValue = (date: string) => {
+  const timestamp = new Date(date).getTime();
+
+  if (Number.isNaN(timestamp)) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  return timestamp;
+};
+
+const getHistoryTimestamp = (entry: BusComponent["history"][number]) => {
+  if (entry.createdAt) {
+    const createdAtTimestamp = new Date(entry.createdAt).getTime();
+
+    if (!Number.isNaN(createdAtTimestamp)) {
+      return createdAtTimestamp;
+    }
+  }
+
+  return getHistorySortValue(entry.date);
+};
+
+const formatHistoryTime = (entry: BusComponent["history"][number]) => {
+  if (entry.createdAt) {
+    const createdAtDate = new Date(entry.createdAt);
+
+    if (!Number.isNaN(createdAtDate.getTime())) {
+      return createdAtDate.toLocaleString();
+    }
+  }
+
+  return entry.date;
+};
+
 export function HistoryModal({ open, onClose, component }: HistoryModalProps) {
   if (!component) return null;
+
+  const sortedHistory = [...component.history].sort((left, right) => {
+    const sortDelta = getHistoryTimestamp(right) - getHistoryTimestamp(left);
+
+    if (sortDelta !== 0) {
+      return sortDelta;
+    }
+
+    return right.id.localeCompare(left.id);
+  });
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -52,10 +96,10 @@ export function HistoryModal({ open, onClose, component }: HistoryModalProps) {
           <DialogTitle>Maintenance History — {component.name}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 pt-2 max-h-80 overflow-y-auto">
-          {component.history.length === 0 ? (
+          {sortedHistory.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">No maintenance history</p>
           ) : (
-            component.history.map((entry) => {
+            sortedHistory.map((entry) => {
               const Icon = typeIcon[entry.type] || Wrench;
               return (
                 <div key={entry.id} className="flex gap-3 items-start">
@@ -64,8 +108,8 @@ export function HistoryModal({ open, onClose, component }: HistoryModalProps) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-foreground">{typeLabel[entry.type] || entry.type.replaceAll("_", " ")}</span>
-                      <span className="text-xs text-muted-foreground font-mono">{entry.date}</span>
+                      <span className="text-sm font-medium text-foreground">{typeLabel[entry.type] || String(entry.type).replace(/_/g, " ")}</span>
+                      <span className="text-xs text-muted-foreground font-mono">{formatHistoryTime(entry)}</span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">{entry.description}</p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">By {entry.technician}</p>

@@ -131,4 +131,59 @@ describe("fleet scope rules", () => {
     expect(fleetModel.getBusById).toHaveBeenCalledWith("bus-1", { depotId: "depot-central" });
     expect(fleetModel.getAssignableUsersForDepot).toHaveBeenCalledWith("depot-central");
   });
+
+  test("AR context exposes pending maintenance approval issues", async () => {
+    authModel.getUserById.mockResolvedValue({
+      id: "manager-1",
+      role: "manager",
+      depot_id: "depot-central"
+    });
+    fleetModel.getBusById.mockResolvedValue({
+      id: "bus-1",
+      name: "Bus 1",
+      depot_id: "depot-central",
+      depot_name: "Central Depot",
+      registration_number: "ABC-123",
+      next_service_at: null
+    });
+    fleetModel.getPartsForBusIds.mockResolvedValue([
+      {
+        id: "part-1",
+        bus_id: "bus-1",
+        name: "Brake Assembly",
+        marker_code: 101,
+        icon_key: "Wrench",
+        condition_state: "repair_needed",
+        lifecycle_state: "within_expected_life",
+        last_inspected_at: null,
+        ar_instructions: []
+      }
+    ]);
+    fleetModel.getIssuesForPartIds.mockResolvedValue([
+      {
+        id: "issue-1",
+        bus_part_id: "part-1",
+        issue_type_id: null,
+        title: "Approve repair",
+        status: "awaiting_approval",
+        priority: "medium",
+        description: "Offline repair request",
+        created_at: "2026-05-06T10:00:00.000Z",
+        latest_comment: "Waiting for manager approval",
+        issue_type_code: null,
+        issue_type_label: null,
+        issue_type_recommended_action: "repair",
+        assigned_to: null,
+        assigned_to_name: null,
+        assigned_to_email: null,
+        maintenance_approval_metadata: {
+          kind: "maintenance_approval_request"
+        }
+      }
+    ]);
+
+    const context = await fleetService.getARContext("bus-1", { id: "manager-1", role: "manager" });
+
+    expect(context.parts[0].activeIssues[0].pendingMaintenanceApproval).toBe(true);
+  });
 });

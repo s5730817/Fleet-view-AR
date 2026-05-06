@@ -1,22 +1,48 @@
 import { useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getBusARContext } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-// @ts-expect-error Migrated JS AR module from myAR package.
+import type { BusARContext } from "@/types/fleet";
 import ARInterface from "@/ar/ARInterface.jsx";
+import { useSyncStatus } from "@/context/SyncStatusContext";
 
 const ARMode = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const location = useLocation();
   const arContainerRef = useRef<HTMLDivElement | null>(null);
   const busId = useMemo(() => new URLSearchParams(location.search).get("busId"), [location.search]);
   const backPath = location.state?.from || "/dashboard";
+  const { isOnline } = useSyncStatus();
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["bus-ar-context", busId],
     queryFn: () => getBusARContext(busId!),
-    enabled: Boolean(busId),
+    enabled: Boolean(busId) && isOnline,
+    initialData: () => {
+      if (!busId) {
+        return undefined;
+      }
+
+      return (location.state?.arContext as BusARContext | undefined)
+        || queryClient.getQueryData<BusARContext>(["bus-ar-context", busId])
+        || undefined;
+    },
   });
+
+  if (!isOnline) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="space-y-4 rounded-2xl border bg-card p-6 text-center shadow-sm">
+          <p className="text-lg font-bold text-foreground">AR mode is unavailable offline</p>
+          <p className="text-sm text-muted-foreground">
+            Use the component cards on the bus detail page to log an issue or record a fix while the device is offline.
+          </p>
+          <Button onClick={() => navigate(backPath)}>Return to bus detail</Button>
+        </div>
+      </div>
+    );
+  }
 
   if (!busId) {
     return (

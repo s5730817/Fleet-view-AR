@@ -51,6 +51,7 @@ export type HistoryEntryType =
 export interface MaintenanceEntry {
   id: string;
   date: string;
+  createdAt?: string;
   type: HistoryEntryType;
   description: string;
   technician: string;
@@ -157,6 +158,7 @@ export interface ARIssue {
   assignedTo: string | null;
   assignedToName: string | null;
   assignedToEmail?: string | null;
+  pendingMaintenanceApproval?: boolean;
   guide: ARGuide;
 }
 
@@ -190,6 +192,25 @@ export interface ARAssignableUser {
   name: string;
   email: string;
   role: string;
+}
+
+export type ARIssueSnapshot = Omit<ARIssue, "guide">;
+
+export interface ARCatalog {
+  issueTypesByPartCode: Record<string, ARIssueTypeOption[]>;
+  depotResourcesById: Record<string, {
+    depotId: string;
+    depotName: string;
+    assignableUsers: ARAssignableUser[];
+    tools: ARToolMarker[];
+  }>;
+}
+
+export interface BusARSnapshot {
+  bus: BusARContext["bus"];
+  parts: Array<Omit<ARBusPart, "issueTypeOptions" | "activeIssues"> & {
+    activeIssues: ARIssueSnapshot[];
+  }>;
 }
 
 export interface BusARContext {

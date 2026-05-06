@@ -109,6 +109,16 @@ cd backend
 npm run seed:postgres
 ```
 
+This seed now loads both the baseline mock-backed fleet data and a deterministic showcase dataset for demos.
+
+If you want to wipe the demo dataset and start fresh before reseeding:
+
+```bash
+cd backend
+npm run reset:postgres
+npm run seed:postgres
+```
+
 6. Start the backend:
 
 ```bash
@@ -158,6 +168,101 @@ cd frontend
 npm run dev:https
 ```
 
+## Partial Offline Mode
+
+The app now supports a first partial-offline PWA slice for depot use.
+
+- Offline mode is intended only for `manager` and `engineer` sessions that have already authenticated online on that device.
+- `admin` remains online-only.
+- Cached reads are available for already-synced fleet, bus detail, jobs, summary, and AR context data.
+- Offline-safe writes are queued locally and synced later: issue creation, comment updates, selected status progression, maintenance logs, and AR part approval.
+- Actions that require fresh server truth should fail fast with `Offline, can not proceed`.
+
+Current offline session behavior:
+
+- The user must have logged in online recently on the same device.
+- The frontend keeps a short-lived offline session marker locally for manager/engineer roles.
+- If the app is offline and that local depot session is still valid, the app can reopen without contacting the backend.
+
+Current runtime dependency policy:
+
+- AR runtime assets are bundled locally from `frontend/public/vendor`.
+- The app shell is cached by the service worker.
+- No CDN fonts are required anymore for the app shell to render offline.
+
+## LAN To Offline Workflow
+
+If you want to connect from another device over LAN once, then continue with offline field functionality, use this flow.
+
+Important constraints:
+
+- If the device is another phone or tablet on your Wi-Fi, offline reads, queued writes, and AR only work after that device has loaded the app from a secure origin.
+- For `localhost`, plain HTTP is treated as secure by the browser. For a LAN IP such as `192.168.x.x`, you must use HTTPS and the device must trust your local CA certificate.
+- If you switch Wi-Fi off completely after preload, the app can keep working only for the already-cached app shell, data, and allowed offline actions.
+- `admin` remains online-only. Offline mode is intended for `manager` and `engineer`.
+
+### Same machine testing
+
+If you are testing on the same machine that runs the frontend:
+
+```bash
+cd frontend
+npm run preview:offline
+```
+
+Open `http://localhost:4173`, sign in online once, open the bus data you need, then disconnect.
+
+### Another device over LAN
+
+1. Generate a dev certificate that includes your machine's LAN IP:
+
+```bash
+cd frontend
+DEV_CERT_HOSTS=localhost,127.0.0.1,::1,<LAN-machine-IP> npm run cert:dev
+```
+
+2. Install and trust `frontend/ca.crt` on the phone/tablet that will use the app.
+
+3. Start the frontend in LAN HTTPS mode:
+
+```bash
+cd frontend
+npm run dev:https:lan
+```
+
+4. Start the backend so the frontend can reach `http://<server-ip>:5000` or your configured API URL.
+
+5. On the device, open:
+
+```text
+https://<LAN-machine-IP>:8080
+```
+
+6. While still online on that LAN:
+
+- log in as `manager` or `tech`
+- wait for the dashboard to finish loading
+- open the buses you need for the session
+- open AR for the bus you want if you plan to use AR offline
+
+7. After that preload step, you can disconnect from Wi-Fi and continue using the offline-safe parts of the app.
+
+### What should work after disconnecting
+
+- fleet overview for the visible depot scope
+- bus detail for cached buses
+- jobs list
+- summary data
+- AR for buses whose AR context was cached during preload
+- offline-safe queued actions such as issue logging, comments, status progression, maintenance logs, and AR approval/fix flows
+
+### What will not work offline
+
+- login on a fresh device that has never authenticated online
+- admin workflows
+- actions that require fresh server truth and are intentionally blocked with `Offline, can not proceed`
+- buses or AR contexts that were never cached on that device before disconnecting
+
 ## Demo Login Accounts
 
 These accounts work in both mock mode and seeded PostgreSQL mode:
@@ -166,6 +271,32 @@ These accounts work in both mock mode and seeded PostgreSQL mode:
 - `manager@test.com` / `password123`    - Maintanance Crew Manager/field+office based
 - `tech1@test.com` / `password123`      - Tech/field based
 - `tech2@test.com` / `password123`      - Tech/field based
+
+## Showcase Demo Cases
+
+The PostgreSQL seed includes dedicated showcase buses with predictable registrations so you can demonstrate each workflow quickly:
+
+- `DMO-100` `Showcase Good`: healthy bus, routine service on schedule, no active issues.
+- `DMO-101` `Showcase Open Reports`: non-blocking open report, near-end-of-life component, and routine service due soon.
+- `DMO-102` `Showcase Approval`: component maintenance due today/overdue with no issue, so AR `Approve` can reset the part.
+- `DMO-103` `Showcase Routine Overdue`: bus-level routine service overdue while components remain otherwise healthy.
+- `DMO-104` `Showcase Blocking Faults`: active blocking reported faults that drive `Needs a fix!` and put the bus out of operation.
+- `DMO-105` `Showcase Under Repair`: in-progress and awaiting-approval repairs, plus a replacement-needed tyre case.
+- `DMO-106` `Showcase Unscheduled Lifecycle`: routine maintenance unscheduled and parts beyond life / beyond-life-approved.
+
+The same seed also marks a few depot tools as `in_use` or `awaiting_return` so tool-tracking states are visible in AR demos.
+
+## Demo Route
+
+If you need a compact presenter flow, use this order:
+
+1. Log in as `manager@test.com` and open `DMO-100` to show the clean baseline state.
+2. Open `DMO-101` to show non-blocking open reports, near-end-of-life attention, and due-soon maintenance.
+3. Open `DMO-102`, launch AR as `tech1@test.com`, and use `Approve` on the due part to show maintenance reset without creating an issue.
+4. Open `DMO-103` to show that routine bus service alone can move the vehicle to `Requires Attention`.
+5. Open `DMO-104` to show blocking reported faults and why the bus is out of operation.
+6. Open `DMO-105`, then switch to `tech2@test.com` in AR to show `Fix`, `Under Repair`, `Awaiting Approval`, and replacement-needed scenarios.
+7. Open `DMO-106` to show `Routine unscheduled`, `beyond_expected_life`, and `beyond_life_approved` lifecycle cases.
 
 ## How To Use The App
 
@@ -272,4 +403,3 @@ Condition and lifecycle states used internally:
 
 - Condition state is now `good`, `repair_needed`, or `replace_recommended`.
 - Lifecycle state is `within_expected_life`, `near_end_of_life`, `beyond_expected_life`, or `beyond_life_approved`.
-- The legacy `watch` condition state is no longer used. Older `watch` data is treated as `good`, and attention is now expressed through lifecycle, issue, or overdue-maintenance indicators instead.

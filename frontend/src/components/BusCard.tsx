@@ -2,16 +2,19 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { BusStatusBadge } from "@/components/StatusBadge";
 import { Bus as BusIcon, Gauge, Calendar, Wrench, ChevronRight } from "lucide-react";
+import { useSyncStatus } from "@/context/SyncStatusContext";
 import type { Bus } from "@/types/fleet";
 import { getDaysAgo } from "@/lib/dateUtils";
 
 export function BusCard({ bus }: { bus: Bus }) {
   const navigate = useNavigate();
+  const { getBusOperationState } = useSyncStatus();
+  const busQueueState = getBusOperationState(bus.id);
 
   return (
     <Card
       className="group cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-primary/30 hover:-translate-y-0.5"
-      onClick={() => navigate(`/bus/${bus.id}`)}
+      onClick={() => navigate(`/bus/${bus.id}`, { state: { from: "/dashboard", bus } })}
     >
       <CardContent className="p-5">
         <div className="flex items-start justify-between mb-4">
@@ -43,6 +46,20 @@ export function BusCard({ bus }: { bus: Bus }) {
         </div>
 
         <div className="mt-3 rounded-lg border bg-background/60 p-3 space-y-1.5 text-xs text-muted-foreground">
+          {(busQueueState.pending > 0 || busQueueState.review > 0) && (
+            <div className="flex flex-wrap items-center gap-2 pb-1">
+              {busQueueState.pending > 0 && (
+                <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 font-semibold text-primary">
+                  {busQueueState.pending} pending sync
+                </span>
+              )}
+              {busQueueState.review > 0 && (
+                <span className="rounded-full border border-status-urgent/30 bg-status-urgent/10 px-2.5 py-1 font-semibold text-status-urgent">
+                  {busQueueState.review} need sync attention
+                </span>
+              )}
+            </div>
+          )}
           <p>
             Routine maintenance: <span className="font-medium text-foreground">{bus.serviceIndicator.label}</span>
           </p>

@@ -12,13 +12,17 @@ jest.mock("../src/models/fault.model", () => ({
   createIssueAssignment: jest.fn(),
   createFaultUpdate: jest.fn(),
   getFaultById: jest.fn(),
+  getLatestMaintenanceApprovalRequest: jest.fn(),
   updateFaultStatus: jest.fn()
 }));
 
 jest.mock("../src/models/fleet.model", () => ({
+  createMaintenanceEntry: jest.fn(),
   getAssignableUsersForDepot: jest.fn(),
   getPartContextById: jest.fn(),
-  reconcilePartConditionFromActiveIssues: jest.fn()
+  reconcilePartConditionFromActiveIssues: jest.fn(),
+  resolveActiveIssuesForPart: jest.fn(),
+  updatePartLifecycleAfterMaintenance: jest.fn(),
 }));
 
 const db = require("../src/database/db");
@@ -68,7 +72,12 @@ describe("fault status synchronization", () => {
       status: "resolved"
     }, { id: "manager-1", role: "manager" });
 
-    expect(faultModel.updateFaultStatus).toHaveBeenCalledWith("issue-1", "resolved", transactionClient);
+    expect(faultModel.updateFaultStatus).toHaveBeenCalledWith(
+      "issue-1",
+      "resolved",
+      transactionClient,
+      { approvedBy: "manager-1" }
+    );
     expect(faultModel.createFaultUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         issue_id: "issue-1",
@@ -168,5 +177,59 @@ describe("fault status synchronization", () => {
     ).rejects.toThrow("Selected assignee is not valid for this bus");
 
     expect(faultModel.createIssueAssignment).not.toHaveBeenCalled();
+  });
+
+  test("manager approval of deferred offline maintenance applies the maintenance and resolves the issue", async () => {
+    faultModel.getFaultById
+      .mockResolvedValueOnce({
+        id: "issue-approval-1",
+        bus_part_id: "part-1",
+        status: "awaiting_approval"
+      })
+      .mockResolvedValueOnce({
+        id: "issue-approval-1",
+        bus_part_id: "part-1",
+        status: "resolved"
+      });
+    faultModel.getLatestMaintenanceApprovalRequest.mockResolvedValue({
+      metadata: {
+        kind: "maintenance_approval_request",
+        maintenance: {
+          busPartId: "part-1",
+          technicianUserId: "tech-1",
+          technicianName: "Tech 1",
+          entryType: "repair",
+          description: "Offline brake repair",
+          notes: "Completed roadside",
+          resolvedIssueIds: ["issue-approval-1"],
+        }
+      }
+    });
+
+    const result = await faultService.updateFaultStatus("issue-approval-1", {
+      status: "resolved"
+    }, { id: "manager-1", role: "manager" });
+
+    expect(fleetModel.createMaintenanceEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bus_part_id: "part-1",
+        user_id: "tech-1",
+        technician_name: "Tech 1",
+        entry_type: "repair",
+        description: "Offline brake repair",
+        notes: "Completed roadside",
+      }),
+      transactionClient
+    );
+    expect(fleetModel.updatePartLifecycleAfterMaintenance).toHaveBeenCalledWith("part-1", "repair", transactionClient);
+    expect(fleetModel.resolveActiveIssuesForPart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        partId: "part-1",
+        issueIds: ["issue-approval-1"],
+        createdBy: "manager-1",
+      }),
+      transactionClient
+    );
+    expect(result.status).toBe("resolved");
   });
 });

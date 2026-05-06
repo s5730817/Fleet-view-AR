@@ -12,9 +12,15 @@ const { authoriseRoles } = require("../middleware/role.middleware");
 // Accessible to any authenticated user (protected at app level)
 router.get("/", fleetController.getAllBuses);
 
+// GET depot-scoped AR catalog shared across visible buses
+router.get("/ar-catalog", fleetController.getARCatalog);
+
 // GET one bus by id
 // Accessible to any authenticated user
 router.get("/:id", fleetController.getBusById);
+
+// GET lightweight bus-specific AR snapshot
+router.get("/:id/ar-snapshot", fleetController.getBusARSnapshot);
 
 // GET bus-specific AR context
 router.get("/:id/ar-context", fleetController.getBusARContext);

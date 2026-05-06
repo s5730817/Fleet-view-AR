@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { usePermission } from "@/context/PermissionContext";
 import { useToast } from "@/hooks/use-toast";
-import { addFaultUpdate, addMaintenanceEntry, createFault, updateFaultStatus } from "@/lib/api";
+import { addMaintenanceEntry, createFault, updateFaultStatus } from "@/lib/api";
 import { APP_STATES } from "./constants";
 import { useAREngine } from "./hooks/useAREngine";
 import { useARTracking } from "./hooks/useARTracking";
@@ -77,9 +77,7 @@ export default function ARInterface({ arContext, onExit, onIssueCreated }) {
         throw new Error("Choose an issue type before creating the AR issue.");
       }
 
-      const storedUser = getStoredUser();
-
-      const createdIssue = await createFault({
+      await createFault({
         title: `${part.name}: ${issueType.label}`,
         description: `${issueType.summary}\n\nBus: ${arContext.bus.name} (${arContext.bus.plateNumber})\nPart marker: ${part.markerCode}`,
         priority: issueType.priority,
@@ -87,14 +85,12 @@ export default function ARInterface({ arContext, onExit, onIssueCreated }) {
         issue_type_id: issueType.id,
         assigned_user_id: assignedUserId || undefined,
         source: "ar_scan",
+        initial_note: note?.trim() || undefined,
+        offline_context: {
+          busId: arContext.bus.id,
+          busName: arContext.bus.name,
+        },
       });
-
-      if (note?.trim()) {
-        await addFaultUpdate(createdIssue.id, {
-          update_type: "comment",
-          description: note.trim(),
-        });
-      }
 
       await onIssueCreated?.();
 
@@ -115,9 +111,16 @@ export default function ARInterface({ arContext, onExit, onIssueCreated }) {
   const handleBeginRepair = async ({ partId, issueId }) => {
     const storedUser = getStoredUser();
 
-    await updateFaultStatus(issueId, {
-      status: "in_progress",
-    });
+    await updateFaultStatus(
+      issueId,
+      {
+        status: "in_progress",
+      },
+      {
+        busId: arContext.bus.id,
+        busName: arContext.bus.name,
+      }
+    );
 
     await onIssueCreated?.();
 
@@ -137,6 +140,8 @@ export default function ARInterface({ arContext, onExit, onIssueCreated }) {
       user_id: storedUser.id,
       resolved_issue_ids: [issue.id],
       notes: `Completed in AR mode using guide: ${issue.guide.title}`,
+    }, {
+      busName: arContext.bus.name,
     });
 
     await onIssueCreated?.();
@@ -155,6 +160,8 @@ export default function ARInterface({ arContext, onExit, onIssueCreated }) {
       description: `AR inspection approval for ${part.name}`,
       user_id: storedUser.id,
       notes: note?.trim() || `Approved in AR mode with no new issue found. Previous maintenance state: ${part.maintenanceIndicator.label}`,
+    }, {
+      busName: arContext.bus.name,
     });
 
     await onIssueCreated?.();

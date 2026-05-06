@@ -6,11 +6,17 @@ jest.mock("../src/models/auth.model", () => ({
   getUserById: jest.fn()
 }));
 
+jest.mock("../src/models/fault.model", () => ({
+  createFault: jest.fn(),
+  createFaultUpdate: jest.fn(),
+}));
+
 jest.mock("../src/models/fleet.model", () => ({
   createMaintenanceEntry: jest.fn(),
   getAssignableUsersForDepot: jest.fn(),
   getBusById: jest.fn(),
   getIssuesForPartIds: jest.fn(),
+  markIssuesAwaitingApproval: jest.fn(),
   getPartsForBusIds: jest.fn(),
   reconcilePartConditionFromActiveIssues: jest.fn(),
   resolveActiveIssuesForPart: jest.fn(),
@@ -19,6 +25,7 @@ jest.mock("../src/models/fleet.model", () => ({
 
 const db = require("../src/database/db");
 const authModel = require("../src/models/auth.model");
+const faultModel = require("../src/models/fault.model");
 const fleetModel = require("../src/models/fleet.model");
 const fleetService = require("../src/services/fleet.service.real");
 
@@ -40,7 +47,7 @@ describe("fleet maintenance flow", () => {
       depot_id: "depot-1"
     });
     fleetModel.getPartsForBusIds.mockResolvedValue([
-      { id: "part-1" }
+      { id: "part-1", name: "Brake Assembly" }
     ]);
     fleetModel.getAssignableUsersForDepot.mockResolvedValue([
       { id: "tech-1", name: "Tech 1", email: "tech1@test.com", role: "engineer" },
@@ -117,5 +124,35 @@ describe("fleet maintenance flow", () => {
       }),
       transactionClient
     );
+  });
+
+  test("offline repair logs create a manager approval request instead of applying immediately", async () => {
+    await fleetService.addMaintenanceEntry("bus-1", "part-1", {
+      type: "repair",
+      description: "Offline brake repair",
+      user_id: "tech-1",
+      resolved_issue_ids: ["issue-1"],
+      requires_manager_approval: true,
+    }, { id: "tech-1", role: "engineer" });
+
+    expect(fleetModel.markIssuesAwaitingApproval).toHaveBeenCalledWith(
+      expect.objectContaining({
+        partId: "part-1",
+        issueIds: ["issue-1"],
+        metadata: expect.objectContaining({
+          kind: "maintenance_approval_request",
+          maintenance: expect.objectContaining({
+            busPartId: "part-1",
+            entryType: "repair",
+            resolvedIssueIds: ["issue-1"],
+          }),
+        }),
+      }),
+      transactionClient
+    );
+    expect(fleetModel.createMaintenanceEntry).not.toHaveBeenCalled();
+    expect(fleetModel.updatePartLifecycleAfterMaintenance).not.toHaveBeenCalled();
+    expect(fleetModel.resolveActiveIssuesForPart).not.toHaveBeenCalled();
+    expect(faultModel.createFault).not.toHaveBeenCalled();
   });
 });

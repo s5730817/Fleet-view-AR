@@ -1,7 +1,8 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { BusCard } from "@/components/BusCard";
-import { useQuery } from "@tanstack/react-query";
-import { getFleet } from "@/lib/api";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getBusById, getFleet } from "@/lib/api";
 import { Bus, Wrench, AlertTriangle, CheckCircle2, ChevronDown } from "lucide-react";
 
 import {
@@ -13,11 +14,27 @@ import {
 
 const Index = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data: fleet = [], isLoading, error } = useQuery({
     queryKey: ["fleet"],
     queryFn: getFleet,
   });
+
+  useEffect(() => {
+    if (!window.navigator.onLine || fleet.length === 0) {
+      return;
+    }
+
+    void (async () => {
+      for (const bus of fleet) {
+        await queryClient.prefetchQuery({
+          queryKey: ["bus", bus.id],
+          queryFn: () => getBusById(bus.id),
+        }).catch(() => null);
+      }
+    })();
+  }, [fleet, queryClient]);
 
   if (isLoading) {
     return (

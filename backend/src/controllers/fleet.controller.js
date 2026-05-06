@@ -46,6 +46,47 @@ exports.getBusById = async (req, res) => {
   }
 };
 
+exports.getARCatalog = async (req, res) => {
+  try {
+    const arCatalog = await fleetService.getARCatalog(req.user);
+
+    res.status(200).json({
+      success: true,
+      data: arCatalog
+    });
+  } catch (err) {
+    console.error("Error fetching AR catalog:", err);
+    res.status(500).json({
+      success: false,
+      error: "Database error"
+    });
+  }
+};
+
+exports.getBusARSnapshot = async (req, res) => {
+  try {
+    const arSnapshot = await fleetService.getARSnapshot(req.params.id, req.user);
+
+    if (!arSnapshot) {
+      return res.status(404).json({
+        success: false,
+        error: "Bus not found"
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: arSnapshot
+    });
+  } catch (err) {
+    console.error("Error fetching AR snapshot:", err);
+    res.status(500).json({
+      success: false,
+      error: "Database error"
+    });
+  }
+};
+
 // GET bus-scoped AR context
 exports.getBusARContext = async (req, res) => {
   try {

@@ -1,0 +1,12 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "preview-offline-root",
+			"type": "shell",
+			"command": "cd frontend && npm run preview:offline",
+			"isBackground": true,
+			"group": "test"
+		}
+	]
+}

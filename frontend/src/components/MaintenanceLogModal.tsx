@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,11 +14,16 @@ import {
 import type { ARAssignableUser, ARIssue, BusComponent, MaintenanceEntry } from "@/types/fleet";
 import { Wrench, RefreshCw, Replace } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { usePermission } from "@/context/PermissionContext";
 import { toast } from "sonner";
 
 type MaintenanceEntryDraft = Omit<MaintenanceEntry, "id"> & {
   user_id: string;
   resolved_issue_ids?: string[];
+};
+
+type MaintenanceSubmitResult = {
+  offlinePending?: boolean;
 };
 
 interface MaintenanceLogModalProps {
@@ -28,7 +33,7 @@ interface MaintenanceLogModalProps {
   busName: string;
   technicians: ARAssignableUser[];
   activeIssues: ARIssue[];
-  onLogSubmit: (componentId: string, entry: MaintenanceEntryDraft) => Promise<void>;
+  onLogSubmit: (componentId: string, entry: MaintenanceEntryDraft) => Promise<MaintenanceSubmitResult>;
 }
 
 type MaintenanceType = "repair" | "service" | "replacement";
@@ -40,12 +45,40 @@ const typeConfig: Record<MaintenanceType, { label: string; icon: React.ElementTy
 };
 
 export function MaintenanceLogModal({ open, onClose, component, busName, technicians, activeIssues, onLogSubmit }: MaintenanceLogModalProps) {
+  const { role } = usePermission();
   const [type, setType] = useState<MaintenanceType>("service");
   const [description, setDescription] = useState("");
   const [technicianUserId, setTechnicianUserId] = useState("");
   const [selectedIssueId, setSelectedIssueId] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const currentUser = useMemo(() => {
+    try {
+      const storedUser = JSON.parse(window.localStorage.getItem("user") || "{}");
+      return {
+        id: typeof storedUser?.id === "string" ? storedUser.id : "",
+        name: typeof storedUser?.name === "string" ? storedUser.name : "You",
+        email: typeof storedUser?.email === "string" ? storedUser.email : "offline@local",
+      };
+    } catch {
+      return {
+        id: "",
+        name: "You",
+        email: "offline@local",
+      };
+    }
+  }, []);
+
+  const availableTechnicians = useMemo(() => {
+    if (technicians.length > 0 || role !== "engineer") {
+      return technicians;
+    }
+
+    return currentUser.id
+      ? [{ id: currentUser.id, name: currentUser.name, email: currentUser.email, role: "engineer" } satisfies ARAssignableUser]
+      : [];
+  }, [currentUser.email, currentUser.id, currentUser.name, role, technicians]);
 
   const requiresIssueSelection = type !== "service" && activeIssues.length > 0;
   const selectedIssue = activeIssues.find((issue) => issue.id === selectedIssueId) || null;
@@ -57,10 +90,10 @@ export function MaintenanceLogModal({ open, onClose, component, busName, technic
 
     setType("service");
     setDescription("");
-    setTechnicianUserId(technicians[0]?.id || "");
+    setTechnicianUserId(availableTechnicians[0]?.id || "");
     setSelectedIssueId("");
     setNotes("");
-  }, [open, technicians]);
+  }, [availableTechnicians, open]);
 
   useEffect(() => {
     if (!open) {
@@ -92,7 +125,7 @@ export function MaintenanceLogModal({ open, onClose, component, busName, technic
       return;
     }
 
-    const selectedTechnician = technicians.find((technician) => technician.id === technicianUserId);
+    const selectedTechnician = availableTechnicians.find((technician) => technician.id === technicianUserId);
 
     if (!selectedTechnician) {
       toast.error("Choose a technician from the depot list");
@@ -111,10 +144,16 @@ export function MaintenanceLogModal({ open, onClose, component, busName, technic
 
     try {
       setSubmitting(true);
-      await onLogSubmit(component!.id, newEntry);
-      toast.success(`${typeConfig[type].label} logged for ${component?.name}`, {
-        description: `Technician: ${selectedTechnician.name}`,
-      });
+      const result = await onLogSubmit(component!.id, newEntry);
+      if (result.offlinePending) {
+        toast.success(`${typeConfig[type].label} queued until sync`, {
+          description: "System is offline. This maintenance log will sync once the device reconnects.",
+        });
+      } else {
+        toast.success(`${typeConfig[type].label} logged for ${component?.name}`, {
+          description: `Technician: ${selectedTechnician.name}`,
+        });
+      }
       onClose();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to log maintenance");
@@ -204,14 +243,14 @@ export function MaintenanceLogModal({ open, onClose, component, busName, technic
                 <SelectValue placeholder="Choose technician" />
               </SelectTrigger>
               <SelectContent>
-                {technicians.map((technician) => (
+                {availableTechnicians.map((technician) => (
                   <SelectItem key={technician.id} value={technician.id}>
                     {technician.name} - {technician.email}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {technicians.length === 0 && (
+            {availableTechnicians.length === 0 && (
               <p className="mt-1 text-xs text-muted-foreground">No technicians are assigned to this depot.</p>
             )}
           </div>
