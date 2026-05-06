@@ -30,7 +30,7 @@ app.use(morgan("dev"));
 app.use("/api/auth", authRoutes);
 
 // Fault routes
-app.use("/api/faults", faultRoutes);
+app.use("/api/faults", protect, faultRoutes);
 
 // Fleet routes
 app.use("/api/fleet", protect, fleetRoutes);

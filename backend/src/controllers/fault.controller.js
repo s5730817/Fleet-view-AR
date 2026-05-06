@@ -66,7 +66,7 @@ exports.getFaultById = async (req, res) => {
 // CREATE a new fault
 exports.createFault = async (req, res) => {
   try {
-    const newFault = await faultService.createFault(req.body);
+    const newFault = await faultService.createFault(req.body, req.user);
 
     res.status(201).json({
       success: true,
@@ -86,7 +86,8 @@ exports.updateFaultStatus = async (req, res) => {
   try {
     const updatedFault = await faultService.updateFaultStatus(
       req.params.id,
-      req.body
+      req.body,
+      req.user
     );
 
     if (!updatedFault) {
@@ -140,7 +141,8 @@ exports.addFaultUpdate = async (req, res) => {
   try {
     const newUpdate = await faultService.addFaultUpdate(
       req.params.id,
-      req.body
+      req.body,
+      req.user
     );
 
     if (!newUpdate) {

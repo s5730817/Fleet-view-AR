@@ -79,6 +79,37 @@ exports.getPartsForBusIds = async (busIds) => {
   return result.rows;
 };
 
+exports.getPartContextById = async (partId) => {
+  if (!partId) {
+    return null;
+  }
+
+  const result = await db.query(
+    `SELECT
+      bus_parts.id,
+      bus_parts.bus_id,
+      buses.depot_id,
+      depots.name AS depot_name,
+      bus_parts.name,
+      bus_parts.condition_state,
+      bus_parts.lifecycle_state,
+      bus_parts.last_repair_at,
+      bus_parts.last_inspected_at,
+      bus_parts.last_service_at,
+      bus_parts.last_replacement_at,
+      bus_parts.ar_instructions,
+      bus_parts.marker_code,
+      bus_parts.icon_key
+     FROM bus_parts
+     INNER JOIN buses ON buses.id = bus_parts.bus_id
+     LEFT JOIN depots ON depots.id = buses.depot_id
+     WHERE bus_parts.id = $1`,
+    [partId]
+  );
+
+  return result.rows[0] || null;
+};
+
 exports.getLifecyclePoliciesForPartCodes = async (partCodes) => {
   const normalizedCodes = [...new Set(partCodes.filter(Boolean))];
   if (normalizedCodes.length === 0) {
@@ -223,9 +254,21 @@ exports.reconcilePartConditionFromActiveIssues = async (partId, executor = db) =
   return nextConditionState;
 };
 
-exports.resolveActiveIssuesForPart = async ({ partId, createdBy, note }, executor = db) => {
+exports.resolveActiveIssuesForPart = async ({ partId, createdBy, note, issueIds }, executor = db) => {
   if (!partId) {
     return [];
+  }
+
+  const normalizedIssueIds = Array.isArray(issueIds)
+    ? [...new Set(issueIds.filter(Boolean))]
+    : [];
+  const queryParams = [partId, ACTIVE_ISSUE_STATUSES];
+  const issueFilter = normalizedIssueIds.length > 0
+    ? ` AND id = ANY($3::uuid[])`
+    : "";
+
+  if (normalizedIssueIds.length > 0) {
+    queryParams.push(normalizedIssueIds);
   }
 
   const result = await executor.query(
@@ -234,6 +277,7 @@ exports.resolveActiveIssuesForPart = async ({ partId, createdBy, note }, executo
        FROM issues
        WHERE bus_part_id = $1
          AND status = ANY($2::text[])
+         ${issueFilter}
      )
      UPDATE issues AS current_issue
      SET status = 'resolved',
@@ -242,7 +286,7 @@ exports.resolveActiveIssuesForPart = async ({ partId, createdBy, note }, executo
      FROM active_issues
      WHERE current_issue.id = active_issues.id
      RETURNING current_issue.id, active_issues.title, active_issues.status`,
-    [partId, ACTIVE_ISSUE_STATUSES]
+    queryParams
   );
 
   for (const issue of result.rows) {

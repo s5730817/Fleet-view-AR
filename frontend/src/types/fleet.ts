@@ -20,7 +20,7 @@ export type ServiceIndicatorState =
   | "overdue"
   | "unscheduled";
 
-export type ComponentIndicatorState = "good" | "watch" | "repair_needed" | "replace_recommended";
+export type ComponentIndicatorState = "good" | "repair_needed" | "replace_recommended";
 
 export type ComponentDisplayState =
   | "good"
@@ -167,6 +167,7 @@ export interface ARBusPart {
   markerCode: number;
   icon: string;
   status: ComponentStatus | string;
+  maintenanceIndicator: BusServiceIndicator;
   conditionState: ComponentIndicatorState;
   conditionLabel: string;
   lifecycleState: LifecycleState;

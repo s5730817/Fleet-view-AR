@@ -27,14 +27,16 @@ const migrationStatements = [
   `CREATE UNIQUE INDEX IF NOT EXISTS part_lifecycle_policies_part_code_idx
      ON part_lifecycle_policies (part_code)`,
   `UPDATE bus_parts
-     SET condition_state = COALESCE(
-           condition_state,
-           CASE
-             WHEN status = 'urgent' OR COALESCE(health_percent, 100) < 40 THEN 'repair_needed'
-             WHEN status = 'due_soon' OR COALESCE(health_percent, 100) < 70 THEN 'watch'
-             ELSE 'good'
-           END
-         ),
+     SET condition_state = CASE
+           WHEN condition_state = 'watch' THEN 'good'
+           ELSE COALESCE(
+             condition_state,
+             CASE
+               WHEN status = 'urgent' OR COALESCE(health_percent, 100) < 40 THEN 'repair_needed'
+               ELSE 'good'
+             END
+           )
+         END,
          lifecycle_state = COALESCE(
            lifecycle_state,
            CASE
@@ -44,7 +46,7 @@ const migrationStatements = [
            END
          ),
          last_inspected_at = COALESCE(last_inspected_at, last_service_at, last_repair_at, NOW())`,
-  `COMMENT ON COLUMN bus_parts.condition_state IS 'good | watch | repair_needed | replace_recommended'`,
+  `COMMENT ON COLUMN bus_parts.condition_state IS 'good | repair_needed | replace_recommended'`,
   `COMMENT ON COLUMN bus_parts.lifecycle_state IS 'within_expected_life | near_end_of_life | beyond_expected_life | beyond_life_approved'`,
   `COMMENT ON COLUMN part_lifecycle_policies.usage_model IS 'days | mileage | issue_burden | inspection'`
 ];

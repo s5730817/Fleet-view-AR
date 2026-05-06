@@ -23,7 +23,10 @@ import {
   Eye,
 } from "lucide-react";
 
-type MaintenanceEntryDraft = Omit<MaintenanceEntry, "id">;
+type MaintenanceEntryDraft = Omit<MaintenanceEntry, "id"> & {
+  user_id: string;
+  resolved_issue_ids?: string[];
+};
 
 const BusDetail = () => {
   const { id } = useParams();
@@ -86,24 +89,13 @@ const BusDetail = () => {
 
   const bus = busData;
 
-  const handleLogSubmit = async (
-    componentId: string,
-    entry: MaintenanceEntryDraft
-  ) => {
+  const handleLogSubmit = async (componentId: string, entry: MaintenanceEntryDraft) => {
     await addMaintenanceEntry(bus.id, componentId, entry);
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["bus", id] }),
       queryClient.invalidateQueries({ queryKey: ["fleet"] }),
     ]);
     await refetch();
-  };
-
-  const getStoredUser = () => {
-    try {
-      return JSON.parse(window.localStorage.getItem("user") || "{}");
-    } catch {
-      return {};
-    }
   };
 
   const handleIssueSubmit = async (
@@ -122,21 +114,18 @@ const BusDetail = () => {
       throw new Error("Choose an issue type before creating the issue");
     }
 
-    const storedUser = getStoredUser();
     const createdIssue = await createFault({
       title: `${issuePart.name}: ${issueType.label}`,
       description: `${issueType.summary}\n\nBus: ${bus.name} (${bus.plateNumber})\nPart marker: ${issuePart.markerCode}`,
       priority: issueType.priority,
       bus_part_id: componentId,
       issue_type_id: issueType.id,
-      created_by: storedUser.id || undefined,
       assigned_user_id: input.assignedUserId || undefined,
       source: "admin_panel",
     });
 
     if (input.note?.trim()) {
       await addFaultUpdate(createdIssue.id, {
-        created_by: storedUser.id || null,
         update_type: "comment",
         description: input.note.trim(),
       });
@@ -153,6 +142,10 @@ const BusDetail = () => {
   const issuePart: ARBusPart | null = issueComponent
     ? arContext?.parts.find((part) => part.id === issueComponent.id) || null
     : null;
+  const logPart: ARBusPart | null = logComponent
+    ? arContext?.parts.find((part) => part.id === logComponent.id) || null
+    : null;
+  const maintenanceTechnicians = (arContext?.assignableUsers || []).filter((user) => user.role === "engineer");
 
   return (
     <main className="container max-w-6xl px-4 py-6 space-y-6">
@@ -270,6 +263,8 @@ const BusDetail = () => {
         onClose={() => setLogComponent(null)}
         component={logComponent}
         busName={bus.name}
+        technicians={maintenanceTechnicians}
+        activeIssues={logPart?.activeIssues || []}
         onLogSubmit={handleLogSubmit}
       />
 

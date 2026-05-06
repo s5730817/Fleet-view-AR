@@ -33,6 +33,10 @@ export function IssueLogModal({
   assignableUsers,
   onIssueSubmit,
 }: IssueLogModalProps) {
+  const engineerAssignees = useMemo(
+    () => assignableUsers.filter((user) => user.role === "engineer"),
+    [assignableUsers]
+  );
   const defaultIssueTypeId = issuePart?.issueTypeOptions[0]?.id || "";
   const [issueTypeId, setIssueTypeId] = useState(defaultIssueTypeId);
   const [assignedUserId, setAssignedUserId] = useState<string>("");
@@ -45,9 +49,9 @@ export function IssueLogModal({
     }
 
     setIssueTypeId(issuePart?.issueTypeOptions[0]?.id || "");
-    setAssignedUserId("");
+    setAssignedUserId(engineerAssignees[0]?.id || "");
     setNote("");
-  }, [issuePart, open]);
+  }, [engineerAssignees, issuePart, open]);
 
   const selectedIssueType = useMemo(
     () => issuePart?.issueTypeOptions.find((option) => option.id === issueTypeId) || null,
@@ -60,11 +64,16 @@ export function IssueLogModal({
       return;
     }
 
+    if (!assignedUserId) {
+      toast.error("Choose who the issue should be assigned to");
+      return;
+    }
+
     try {
       setSubmitting(true);
       await onIssueSubmit(component.id, {
         issueTypeId,
-        assignedUserId: assignedUserId || undefined,
+        assignedUserId,
         note: note.trim() || undefined,
       });
       toast.success(`Issue logged for ${component.name}`);
@@ -109,17 +118,19 @@ export function IssueLogModal({
             <Label className="text-xs">Assign To</Label>
             <Select value={assignedUserId} onValueChange={setAssignedUserId}>
               <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Leave unassigned" />
+                <SelectValue placeholder="Choose assignee" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="unassigned">Unassigned</SelectItem>
-                {assignableUsers.map((user) => (
+                {engineerAssignees.map((user) => (
                   <SelectItem key={user.id} value={user.id}>
                     {user.name} - {user.role}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {engineerAssignees.length === 0 && (
+              <p className="mt-1 text-xs text-muted-foreground">No depot engineers are available for assignment.</p>
+            )}
           </div>
 
           {selectedIssueType && (
@@ -154,7 +165,7 @@ export function IssueLogModal({
 
           <div className="flex gap-2 pt-2">
             <Button variant="outline" onClick={onClose} className="flex-1" disabled={submitting}>Cancel</Button>
-            <Button onClick={handleSubmit} className="flex-1" disabled={submitting || !issueTypeId}>
+            <Button onClick={handleSubmit} className="flex-1" disabled={submitting || !issueTypeId || !assignedUserId}>
               {submitting ? "Saving..." : "Create Issue"}
             </Button>
           </div>

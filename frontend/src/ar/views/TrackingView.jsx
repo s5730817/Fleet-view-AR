@@ -17,6 +17,7 @@ export function TrackingView({
   onCreateIssue,
   onBeginRepair,
   onCompleteMaintenance,
+  onApprovePart,
   canCreate,
 }) {
   const [isIssueOpen, setIsIssueOpen] = useState(false);
@@ -62,8 +63,16 @@ export function TrackingView({
     () => detectedTools.map((tool) => tool.name),
     [detectedTools],
   );
+  const issueAssignableUsers = useMemo(
+    () => assignableUsers.filter((user) => user.role === "engineer"),
+    [assignableUsers],
+  );
   const workflowSteps = repairWorkflow?.guide?.steps || [];
   const currentWorkflowStep = workflowSteps[repairWorkflow?.currentStepIndex || 0] || null;
+  const canApproveSelectedPart = Boolean(
+    selectedPart
+    && ["due_soon", "due_today", "overdue"].includes(selectedPart.maintenanceIndicator?.state)
+  );
 
   useEffect(() => {
     if (!repairWorkflow) {
@@ -159,7 +168,7 @@ export function TrackingView({
 
     setSelectedPartId(part.id);
     setSelectedIssueTypeId(part.issueTypeOptions[0]?.id || "");
-    setSelectedAssigneeId(assignableUsers[0]?.id || "");
+    setSelectedAssigneeId(issueAssignableUsers[0]?.id || "");
     setIssueNote("");
     setIsIssueOpen(true);
   };
@@ -173,7 +182,13 @@ export function TrackingView({
     setSelectedIssueTypeId(aimedPart.issueTypeOptions[0]?.id || "");
     setSelectedAssigneeId("");
     setSelectedRepairIssueId(aimedPart.activeIssues[0]?.id || "");
-    setEngineerActionMode(aimedPart.activeIssues.length > 0 ? "fix" : "issue");
+    setEngineerActionMode(
+      aimedPart.activeIssues.length > 0
+        ? "fix"
+        : ["due_soon", "due_today", "overdue"].includes(aimedPart.maintenanceIndicator?.state)
+          ? "approve"
+          : "issue"
+    );
     setIssueNote("");
     setIsEngineerActionOpen(true);
   };
@@ -245,6 +260,27 @@ export function TrackingView({
         toolsConfirmed: false,
       });
       setCurrentStepChecked(false);
+      setIsEngineerActionOpen(false);
+      setIssueNote("");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEngineerApproval = async () => {
+    if (!selectedPart || !canApproveSelectedPart) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await onApprovePart({
+        partId: selectedPart.id,
+        part: selectedPart,
+        note: issueNote.trim(),
+      });
+
       setIsEngineerActionOpen(false);
       setIssueNote("");
     } finally {
@@ -345,7 +381,9 @@ export function TrackingView({
                 <div className="mt-3 text-xs text-white/80">
                   {aimedPart.activeIssues.length > 0
                     ? `${aimedPart.activeIssues.length} active issue${aimedPart.activeIssues.length === 1 ? "" : "s"} available for guided repair.`
-                    : "No active issues yet. Log a new issue from the action menu."}
+                    : canApproveSelectedPart
+                      ? `No active issues. ${aimedPart.maintenanceIndicator.label} can be approved from the action menu.`
+                      : "No active issues yet. Log a new issue from the action menu."}
                 </div>
               </div>
             ) : (
@@ -533,13 +571,16 @@ export function TrackingView({
                 onChange={(event) => setSelectedAssigneeId(event.target.value)}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
-                <option value="">Unassigned</option>
-                {assignableUsers.map((user) => (
+                {issueAssignableUsers.map((user) => (
                   <option key={user.id} value={user.id}>
                     {user.name} · {user.role}
                   </option>
                 ))}
               </select>
+
+              {issueAssignableUsers.length === 0 && (
+                <p className="text-xs text-muted-foreground">No depot engineers are available for assignment.</p>
+              )}
 
               {selectedIssueType && (
                 <div className="rounded-lg border border-border bg-background/60 p-3 text-sm">
@@ -571,7 +612,7 @@ export function TrackingView({
               <button
                 type="button"
                 onClick={handleIssueSubmit}
-                disabled={!selectedPart || !selectedIssueType || isSubmitting}
+                disabled={!selectedPart || !selectedIssueType || !selectedAssigneeId || isSubmitting}
                 className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isSubmitting ? "Saving..." : "Create Issue"}
@@ -586,7 +627,7 @@ export function TrackingView({
           <div className="mx-auto mt-4 w-full max-w-md rounded-xl border border-border bg-card p-4 text-foreground shadow-xl sm:mt-10">
             <h3 className="text-lg font-bold">Choose Action For {selectedPart?.name}</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Log a new issue or start a guided repair/replacement for the part currently in the aim helper.
+              Log a new issue, start a guided repair/replacement, or approve a due inspection for the part currently in the aim helper.
             </p>
 
             <div className="mt-4 flex gap-2">
@@ -601,9 +642,17 @@ export function TrackingView({
                 type="button"
                 onClick={() => setEngineerActionMode("fix")}
                 disabled={!selectedPart || selectedPart.activeIssues.length === 0}
-                className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                className={`flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${engineerActionMode === "fix" ? "border-primary bg-primary/10 text-primary" : "border-border bg-background"}`}
               >
                 Fix
+              </button>
+              <button
+                type="button"
+                onClick={() => setEngineerActionMode("approve")}
+                disabled={!canApproveSelectedPart}
+                className={`flex-1 rounded-md border px-3 py-2 text-sm font-semibold ${engineerActionMode === "approve" ? "border-primary bg-primary/10 text-primary" : "border-border bg-background"} disabled:cursor-not-allowed disabled:opacity-50`}
+              >
+                Approve
               </button>
             </div>
 
@@ -621,20 +670,6 @@ export function TrackingView({
                       </option>
                     ))}
                   </select>
-
-                  <select
-                    value={selectedAssigneeId}
-                    onChange={(event) => setSelectedAssigneeId(event.target.value)}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    <option value="">Unassigned</option>
-                    {assignableUsers.map((user) => (
-                      <option key={user.id} value={user.id}>
-                        {user.name} · {user.role}
-                      </option>
-                    ))}
-                  </select>
-
                   {selectedIssueType && (
                     <div className="rounded-lg border border-border bg-background/60 p-3 text-sm">
                       <p className="font-semibold text-foreground">{selectedIssueType.label}</p>
@@ -645,7 +680,7 @@ export function TrackingView({
                     </div>
                   )}
                 </>
-              ) : (
+              ) : engineerActionMode === "fix" ? (
                 <>
                   {selectedPart?.activeIssues.length > 0 ? (
                     <>
@@ -680,12 +715,30 @@ export function TrackingView({
                     </div>
                   )}
                 </>
+              ) : (
+                <div className="rounded-lg border border-border bg-background/60 p-3 text-sm">
+                  {canApproveSelectedPart ? (
+                    <>
+                      <p className="font-semibold text-foreground">Approve inspection with no fault found</p>
+                      <p className="mt-1 text-muted-foreground">
+                        This records a service approval for {selectedPart?.name} and resets the due maintenance state without creating or resolving an issue.
+                      </p>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Current maintenance state: {selectedPart?.maintenanceIndicator?.label}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground">
+                      This part is not currently due for approval in AR mode.
+                    </p>
+                  )}
+                </div>
               )}
 
               <textarea
                 value={issueNote}
                 onChange={(event) => setIssueNote(event.target.value)}
-                placeholder="Add an initial note (optional)"
+                placeholder={engineerActionMode === "approve" ? "Add an inspection note (optional)" : "Add an initial note (optional)"}
                 rows={3}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               />
@@ -701,11 +754,11 @@ export function TrackingView({
               </button>
               <button
                 type="button"
-                onClick={engineerActionMode === "issue" ? handleEngineerIssueSubmit : handleEngineerFixStart}
-                disabled={engineerActionMode === "issue" ? (!selectedPart || !selectedIssueType || isSubmitting) : (!selectedPart || !selectedRepairIssue || isSubmitting)}
+                onClick={engineerActionMode === "issue" ? handleEngineerIssueSubmit : engineerActionMode === "fix" ? handleEngineerFixStart : handleEngineerApproval}
+                disabled={engineerActionMode === "issue" ? (!selectedPart || !selectedIssueType || isSubmitting) : engineerActionMode === "fix" ? (!selectedPart || !selectedRepairIssue || isSubmitting) : (!selectedPart || !canApproveSelectedPart || isSubmitting)}
                 className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isSubmitting ? "Saving..." : engineerActionMode === "issue" ? "Create Issue" : "Load Fix Instructions"}
+                {isSubmitting ? "Saving..." : engineerActionMode === "issue" ? "Create Issue" : engineerActionMode === "fix" ? "Load Fix Instructions" : "Approve Part"}
               </button>
             </div>
           </div>

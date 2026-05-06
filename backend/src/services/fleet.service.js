@@ -64,7 +64,7 @@ const routineServiceOffsetsByBusId = {
 
 const legacyConditionStateMap = {
   Good: "good",
-  "Due Soon": "watch",
+  "Due Soon": "good",
   Urgent: "repair_needed"
 };
 

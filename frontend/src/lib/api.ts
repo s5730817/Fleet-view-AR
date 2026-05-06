@@ -176,7 +176,6 @@ export const createFault = async ({
   priority,
   bus_part_id,
   issue_type_id,
-  created_by,
   assigned_user_id,
   source,
 }: {
@@ -185,7 +184,6 @@ export const createFault = async ({
   priority: "low" | "medium" | "high";
   bus_part_id?: string;
   issue_type_id?: string;
-  created_by?: string;
   assigned_user_id?: string;
   source?: string;
 }) => {
@@ -198,7 +196,6 @@ export const createFault = async ({
       priority,
       bus_part_id,
       issue_type_id,
-      created_by,
       assigned_user_id,
       source,
     }),
@@ -217,7 +214,6 @@ export const updateFaultStatus = async (
   issueId: string,
   body: {
     status: "reported" | "in_progress" | "awaiting_approval" | "resolved";
-    created_by?: string | null;
   }
 ) => {
   const res = await fetch(`${API_URL}/faults/${issueId}/status`, {
@@ -238,7 +234,6 @@ export const updateFaultStatus = async (
 export const addFaultUpdate = async (
   issueId: string,
   update: {
-    created_by?: string | null;
     update_type: "comment" | "status_change" | "sign_off";
     description: string;
     status_from?: string | null;

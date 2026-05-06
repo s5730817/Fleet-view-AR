@@ -229,3 +229,47 @@ Current tool markers in each depot:
 9. `508` Multimeter
 
 See ./markers
+
+### Indicator Logic
+
+Fleet and part indicators are derived from live part condition, issue state, lifecycle state, and routine maintenance dates.
+
+Bus status:
+
+- `Good`: no component is blocking service and routine bus service is not overdue.
+- `Requires Attention`: at least one component needs attention, or routine bus service is overdue, but no component is currently blocking service.
+- `Out Of Operation`: at least one component is under repair, needs a fix or replacement, or needs replacement immediately.
+
+Component status:
+
+- `Good`: no blocking issues, not out of life, and no overdue component-specific inspection rule.
+- `Requires Attention`: used for non-blocking risk such as overdue component inspection, open reports that do not force the part offline, or lifecycle drift that is not yet a hard stop.
+- `Replacement Recommended`: the part is beyond expected life, but not yet in a blocking failure state.
+- `Needs Fix or Replacement`: the part has a blocking condition state from active issues.
+- `Needs Replacement!`: the part is both beyond expected life and in a blocking condition.
+- `Under Repair`: there is an active issue already in `in_progress` or `awaiting_approval`.
+
+Issue indicators:
+
+- `No active issues`: no open issues are linked to the bus.
+- `Needs a fix!`: there are active issues and at least one linked part is already in a blocking condition state.
+- `Under repair`: at least one linked issue is in `in_progress` or `awaiting_approval`.
+
+Routine maintenance indicators:
+
+- `Routine unscheduled`: no next service date is set.
+- `Routine due in N days`: next service date exists and is more than 7 days away.
+- `Routine due today`: next service date is today.
+- `Routine overdue`: next service date is in the past.
+
+Component-specific maintenance indicators:
+
+- These are only meaningful when a part has an inspection interval from lifecycle policy data.
+- They are computed from `last_inspected_at + inspection_interval_days`.
+- An overdue component inspection raises the component to `Requires Attention`, but does not by itself force the bus `Out Of Operation`.
+
+Condition and lifecycle states used internally:
+
+- Condition state is now `good`, `repair_needed`, or `replace_recommended`.
+- Lifecycle state is `within_expected_life`, `near_end_of_life`, `beyond_expected_life`, or `beyond_life_approved`.
+- The legacy `watch` condition state is no longer used. Older `watch` data is treated as `good`, and attention is now expressed through lifecycle, issue, or overdue-maintenance indicators instead.

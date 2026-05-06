@@ -66,15 +66,29 @@ describe("fleet scope rules", () => {
   });
 
   test("admin fleet access is not depot restricted", async () => {
+    authModel.getUserById.mockResolvedValue({
+      id: "admin-1",
+      role: "admin",
+      depot_id: "depot-north",
+      name: "Admin",
+      email: "admin@test.com"
+    });
     fleetModel.getAllBuses.mockResolvedValue([]);
 
     await fleetService.getAllBuses({ id: "admin-1", role: "admin" });
 
-    expect(authModel.getUserById).not.toHaveBeenCalled();
+    expect(authModel.getUserById).toHaveBeenCalledWith("admin-1");
     expect(fleetModel.getAllBuses).toHaveBeenCalledWith({ depotId: null });
   });
 
-  test("admin issue assignment includes users across all depots", async () => {
+  test("admin issue assignment is limited to engineers in the bus depot", async () => {
+    authModel.getUserById.mockResolvedValue({
+      id: "admin-1",
+      role: "admin",
+      depot_id: "depot-north",
+      name: "Admin",
+      email: "admin@test.com"
+    });
     fleetModel.getBusById.mockResolvedValue({
       id: "bus-1",
       name: "Bus 1",
@@ -84,11 +98,16 @@ describe("fleet scope rules", () => {
       next_service_at: null
     });
     fleetModel.getPartsForBusIds.mockResolvedValue([]);
+    fleetModel.getAssignableUsersForDepot.mockResolvedValue([
+      { id: "tech-1", name: "Tech 1", email: "tech1@test.com", role: "engineer" },
+      { id: "manager-2", name: "Manager 2", email: "manager2@test.com", role: "manager" }
+    ]);
 
-    await fleetService.getARContext("bus-1", { id: "admin-1", role: "admin" });
+    const context = await fleetService.getARContext("bus-1", { id: "admin-1", role: "admin" });
 
     expect(fleetModel.getBusById).toHaveBeenCalledWith("bus-1", { depotId: null });
-    expect(fleetModel.getAssignableUsersForDepot).toHaveBeenCalledWith(null);
+    expect(fleetModel.getAssignableUsersForDepot).toHaveBeenCalledWith("depot-central");
+    expect(context.assignableUsers.map((user) => user.id)).toEqual(["tech-1"]);
   });
 
   test("manager issue assignment stays within the visible depot", async () => {

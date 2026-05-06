@@ -3,6 +3,7 @@
 const express = require("express");
 const router = express.Router();
 const faultController = require("../controllers/fault.controller");
+const { authoriseRoles } = require("../middleware/role.middleware");
 
 // GET dashboard summary for faults
 router.get("/summary", faultController.getFaultSummary);
@@ -14,15 +15,15 @@ router.get("/", faultController.getAllFaults);
 router.get("/:id", faultController.getFaultById);
 
 // CREATE a new fault
-router.post("/", faultController.createFault);
+router.post("/", authoriseRoles("engineer", "manager", "admin"), faultController.createFault);
 
 // UPDATE a fault's status
-router.patch("/:id/status", faultController.updateFaultStatus);
+router.patch("/:id/status", authoriseRoles("engineer", "manager", "admin"), faultController.updateFaultStatus);
 
 // GET all updates for one fault
 router.get("/:id/updates", faultController.getFaultUpdates);
 
 // CREATE a new update for one fault
-router.post("/:id/updates", faultController.addFaultUpdate);
+router.post("/:id/updates", authoriseRoles("engineer", "manager", "admin"), faultController.addFaultUpdate);
 
 module.exports = router;

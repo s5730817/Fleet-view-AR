@@ -33,7 +33,7 @@ const toTimestamp = (value) => {
 
 const componentStatusMap = {
   Good: "good",
-  "Due Soon": "watch",
+  "Due Soon": "good",
   Urgent: "repair_needed"
 };
 
