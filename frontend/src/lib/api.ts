@@ -1,6 +1,6 @@
 const API_URL =
   (import.meta.env.VITE_API_URL as string | undefined)?.trim() ||
-  `http://${window.location.hostname}:5000/api`;
+  `/api`;
 
 // Get the saved login token from localStorage
 const getToken = () => localStorage.getItem("token");
