@@ -229,7 +229,7 @@ const Login = () => {
                 />
             </div>
 
-            <p className="text-xs text-muted-foreground">
+            <p className="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-500">
               Prototype mode: check backend terminal for your code.
             </p>
 
