@@ -158,12 +158,12 @@ export function Navbar() {
                 Dashboard
               </DropdownMenuItem>
 
-              <DropdownMenuItem onClick={() => navigate("/summary")}>
-                Summary
+              <DropdownMenuItem onClick={() => navigate("/jobs")}>
+                My Jobs
               </DropdownMenuItem>
 
-              <DropdownMenuItem onClick={() => navigate("/ar")}>
-                AR Mode
+              <DropdownMenuItem onClick={() => navigate("/summary")}>
+                Summary
               </DropdownMenuItem>
 
               <DropdownMenuItem onClick={() => navigate("/tool-tracker")}>
@@ -221,13 +221,9 @@ export function Navbar() {
               {/* Navigation (extra pages not in navbar) */}
               <div className="px-3 py-1">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Navigation
+                  Workspace
                 </p>
               </div>
-
-              <DropdownMenuItem onClick={() => navigate("/jobs")}>
-                My Jobs
-              </DropdownMenuItem>
 
               <DropdownMenuItem onClick={() => navigate("/team")}>
                 Team
