@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Navigate } from "react-router-dom";
+
 import { getSummary, type SummaryPeriod } from "@/lib/api";
 
 import { StatCard } from "@/components/StatCard";
@@ -30,6 +32,15 @@ const periodOptions: {
 ];
 
 const Summary = () => {
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+  const canViewSummary =
+    user?.role === "admin" || user?.role === "manager";
+
+  if (!canViewSummary) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   const [period, setPeriod] = useState<SummaryPeriod>("week");
 
   const { data, isLoading, error } = useQuery({
@@ -80,7 +91,8 @@ const Summary = () => {
               </h1>
 
               <p className="text-sm text-muted-foreground">
-                Overview of maintenance workload, fleet condition and job completion performance across all depots.
+                Overview of maintenance workload, fleet condition and job
+                completion performance across all depots.
               </p>
 
               <p className="mt-2 text-xs font-medium text-primary">
@@ -89,7 +101,8 @@ const Summary = () => {
             </div>
           </div>
 
-          <div className="relative w-full md:w-48">
+          {/* PERIOD SELECT */}
+          <div className="relative w-full md:w-52">
             <select
               value={period}
               onChange={(event) =>
@@ -148,7 +161,8 @@ const Summary = () => {
       <div className="grid gap-4 lg:grid-cols-2">
         <DashboardCard title="Jobs Raised vs Completed">
           <p className="mb-4 text-sm text-muted-foreground">
-            Compares maintenance jobs created against jobs completed for {periodLabel.toLowerCase()}.
+            Compares maintenance jobs created against jobs completed for{" "}
+            {periodLabel.toLowerCase()}.
           </p>
 
           <CreatedCompletedChart data={createdCompletedData} />
@@ -156,7 +170,8 @@ const Summary = () => {
 
         <DashboardCard title="Fleet Condition Breakdown">
           <p className="mb-4 text-sm text-muted-foreground">
-            Shows the current live operational state of the fleet using dashboard data.
+            Shows the current live operational state of the fleet using
+            dashboard data.
           </p>
 
           <FleetConditionChart data={fleetConditionData} />
@@ -167,7 +182,8 @@ const Summary = () => {
       <div className="grid gap-4 lg:grid-cols-2">
         <DashboardCard title="On-Time vs Overdue Jobs">
           <p className="mb-4 text-sm text-muted-foreground">
-            Displays how many maintenance jobs stayed on schedule compared with jobs that became overdue.
+            Displays how many maintenance jobs stayed on schedule compared with
+            jobs that became overdue.
           </p>
 
           <OnTimeOverdueChart data={onTimeOverdueData} />
@@ -175,7 +191,8 @@ const Summary = () => {
 
         <DashboardCard title="Jobs by Current Status">
           <p className="mb-4 text-sm text-muted-foreground">
-            Breaks down the maintenance workload by current job state for {periodLabel.toLowerCase()}.
+            Breaks down the maintenance workload by current job state for{" "}
+            {periodLabel.toLowerCase()}.
           </p>
 
           <JobsByStatusChart data={jobsByStatusData} />

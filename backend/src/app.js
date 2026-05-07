@@ -10,6 +10,7 @@ const fleetRoutes = require("./routes/fleet.route");
 const jobRoutes = require("./routes/job.route");
 const summaryRoutes = require("./routes/summary.route");
 const teamRoutes = require("./routes/team.route");
+const notificationRoutes = require("./routes/notification.route");
 const { protect } = require("./middleware/auth.middleware");
 const { authoriseRoles } = require("./middleware/role.middleware");
 const app = express();
@@ -44,6 +45,9 @@ app.use("/api/summary", protect, summaryRoutes);
 
 // Team routes
 app.use("/api/team", protect, teamRoutes);
+
+// Notification routes
+app.use("/api/notifications", protect, notificationRoutes);
 
 // Test route
 app.get("/", (req, res) => {

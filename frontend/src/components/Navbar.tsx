@@ -15,9 +15,24 @@ const USER_CHANGED_EVENT = "transitlens:user-changed";
 
 export function Navbar() {
   const navigate = useNavigate();
-  const { isOnline, pendingCount, reviewCount, syncInProgress, bootstrapInProgress, offlineReady, offlineMissingResources, hasOfflineAccess, prepareOfflineNow, syncNow } = useSyncStatus();
+
+  const {
+    isOnline,
+    pendingCount,
+    reviewCount,
+    syncInProgress,
+    bootstrapInProgress,
+    offlineReady,
+    offlineMissingResources,
+    hasOfflineAccess,
+    prepareOfflineNow,
+    syncNow,
+  } = useSyncStatus();
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+  const canViewSummary =
+    user?.role === "admin" || user?.role === "manager";
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -57,17 +72,17 @@ export function Navbar() {
   const offlineStatusTone = !isOnline
     ? "border-status-service/30 bg-status-service/10 text-status-service"
     : offlineReady
-      ? "border-status-operational/30 bg-status-operational/10 text-status-operational"
-      : "border-status-service/30 bg-status-service/10 text-status-service";
+    ? "border-status-operational/30 bg-status-operational/10 text-status-operational"
+    : "border-status-service/30 bg-status-service/10 text-status-service";
 
-  const offlineStatusDetail = isOnline && !offlineReady && offlineMissingResources.length > 0
-    ? `Still missing: ${offlineMissingResources.join(", ")}`
-    : null;
+  const offlineStatusDetail =
+    isOnline && !offlineReady && offlineMissingResources.length > 0
+      ? `Still missing: ${offlineMissingResources.join(", ")}`
+      : null;
 
   return (
     <header className="sticky top-0 z-10 border-b bg-card">
       <div className="container max-w-6xl flex items-center gap-3 px-4 py-3">
-
         {/* LEFT: Logo */}
         <div className="flex min-w-0 items-center gap-3">
           <img
@@ -92,15 +107,21 @@ export function Navbar() {
           <NavLink to="/dashboard" className={linkClass}>
             Dashboard
           </NavLink>
+
           <NavLink to="/jobs" className={linkClass}>
             My Jobs
           </NavLink>
-          <NavLink to="/summary" className={linkClass}>
-            Summary
-          </NavLink>
+
+          {canViewSummary && (
+            <NavLink to="/summary" className={linkClass}>
+              Summary
+            </NavLink>
+          )}
+
           <NavLink to="/tool-tracker" className={linkClass}>
             Tool Tracker
           </NavLink>
+
           <NavLink to="/maintenance-reports" className={linkClass}>
             Maintenance Reports
           </NavLink>
@@ -112,19 +133,27 @@ export function Navbar() {
               Preparing offline data...
             </span>
           ) : null}
+
           {isOnline && !bootstrapInProgress && offlineReady ? (
             <span className="rounded-full border border-status-operational/30 bg-status-operational/10 px-3 py-1 text-xs font-semibold text-status-operational">
               Offline ready
             </span>
           ) : null}
+
           {reviewCount > 0 ? (
             <span className="rounded-full border border-status-urgent/30 bg-status-urgent/10 px-3 py-1 text-xs font-semibold text-status-urgent">
               {reviewCount} need sync attention
             </span>
           ) : null}
+
           {!isOnline ? (
             <span className="rounded-full border border-status-service/30 bg-status-service/10 px-3 py-1 text-xs font-semibold text-status-service">
-              Offline{pendingCount > 0 ? ` · ${pendingCount} pending` : hasOfflineAccess ? " · local session ready" : ""}
+              Offline
+              {pendingCount > 0
+                ? ` · ${pendingCount} pending`
+                : hasOfflineAccess
+                ? " · local session ready"
+                : ""}
             </span>
           ) : pendingCount > 0 ? (
             <button
@@ -140,12 +169,14 @@ export function Navbar() {
         {/* RIGHT: Mobile Nav + Account */}
         <div className="ml-auto flex items-center gap-2">
           {offlineStatusLabel ? (
-            <span className={`max-w-[9rem] truncate rounded-full border px-2.5 py-1 text-[11px] font-semibold md:hidden ${offlineStatusTone}`}>
+            <span
+              className={`max-w-[9rem] truncate rounded-full border px-2.5 py-1 text-[11px] font-semibold md:hidden ${offlineStatusTone}`}
+            >
               {offlineStatusLabel}
             </span>
           ) : null}
 
-          {/* MOBILE NAV (ONLY NAVBAR LINKS) */}
+          {/* MOBILE NAV */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex h-9 w-9 items-center justify-center rounded-full bg-muted hover:bg-muted/80 lg:hidden">
@@ -162,15 +193,19 @@ export function Navbar() {
                 My Jobs
               </DropdownMenuItem>
 
-              <DropdownMenuItem onClick={() => navigate("/summary")}>
-                Summary
-              </DropdownMenuItem>
+              {canViewSummary && (
+                <DropdownMenuItem onClick={() => navigate("/summary")}>
+                  Summary
+                </DropdownMenuItem>
+              )}
 
               <DropdownMenuItem onClick={() => navigate("/tool-tracker")}>
                 Tool Tracker
               </DropdownMenuItem>
 
-              <DropdownMenuItem onClick={() => navigate("/maintenance-reports")}>
+              <DropdownMenuItem
+                onClick={() => navigate("/maintenance-reports")}
+              >
                 Maintenance Reports
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -196,21 +231,27 @@ export function Navbar() {
 
               {offlineStatusLabel ? (
                 <div className="px-3 pb-2">
-                  <div className={`rounded-md border px-2.5 py-2 text-xs ${offlineStatusTone}`}>
+                  <div
+                    className={`rounded-md border px-2.5 py-2 text-xs ${offlineStatusTone}`}
+                  >
                     <p className="font-semibold">{offlineStatusLabel}</p>
+
                     {offlineStatusDetail ? (
                       <p className="mt-1 font-normal leading-relaxed opacity-90">
                         {offlineStatusDetail}
                       </p>
                     ) : null}
                   </div>
+
                   {isOnline && !offlineReady ? (
                     <button
                       type="button"
                       onClick={() => void prepareOfflineNow()}
                       className="mt-2 w-full rounded-md border border-primary/30 bg-primary/10 px-2.5 py-2 text-xs font-semibold text-primary"
                     >
-                      {bootstrapInProgress ? "Preparing..." : "Retry offline prep"}
+                      {bootstrapInProgress
+                        ? "Preparing..."
+                        : "Retry offline prep"}
                     </button>
                   ) : null}
                 </div>
@@ -218,7 +259,7 @@ export function Navbar() {
 
               <DropdownMenuSeparator />
 
-              {/* Navigation (extra pages not in navbar) */}
+              {/* Workspace */}
               <div className="px-3 py-1">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Workspace
@@ -271,7 +312,6 @@ export function Navbar() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
         </div>
       </div>
     </header>
