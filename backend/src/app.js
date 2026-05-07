@@ -2,57 +2,53 @@ const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
 const helmet = require("helmet");
-
-// Import routes
 const faultRoutes = require("./routes/fault.route");
 const authRoutes = require("./routes/auth.route");
 const fleetRoutes = require("./routes/fleet.route");
 const jobRoutes = require("./routes/job.route");
 const summaryRoutes = require("./routes/summary.route");
 const { protect } = require("./middleware/auth.middleware");
-const { authoriseRoles } = require("./middleware/role.middleware");
+const apiLimiter = require('./middleware/rateLimiter.middleware');
+
 const app = express();
 
-// Middleware
+// Trust proxy (required if behind Nginx, Railway, Render, AWS, etc.)
+app.set('trust proxy', 1);
+
+// Global middleware
 app.use(cors());
-app.use(
-  helmet({
-    contentSecurityPolicy: false
-  })
-);
-// 500 kb payload limit
-app.use(express.json({
-  limit: "500kb"
-}));
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(express.json({ limit: "500kb" }));
 app.use(morgan("dev"));
 
-// Auth routes
+// Rate limit all /api routes before anything else
+app.use("/api/", apiLimiter);
+
+// Auth routes (no protect needed)
 app.use("/api/auth", authRoutes);
 
-// Fault routes
+// Protected routes
 app.use("/api/faults", protect, faultRoutes);
-
-// Fleet routes
 app.use("/api/fleet", protect, fleetRoutes);
-
-// Job routes
 app.use("/api/jobs", protect, jobRoutes);
-
-// Summary routes
 app.use("/api/summary", protect, summaryRoutes);
 
-// Test route
+// Health check
 app.get("/", (req, res) => {
-  res.json({
-    message: "AR Maintenance Backend is running"
-  });
+  res.json({ message: "AR Maintenance Backend is running" });
 });
 
-// 404 handler for unknown routes
+// 404 handler
 app.use((req, res) => {
-  res.status(404).json({
+  res.status(404).json({ success: false, error: "Route not found" });
+});
+
+// Global error handler (must be last, 4 params required)
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(err.status || 500).json({
     success: false,
-    error: "Route not found"
+    error: err.message || "Internal Server Error"
   });
 });
 
