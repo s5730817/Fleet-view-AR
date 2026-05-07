@@ -58,9 +58,6 @@ export function Navbar() {
           <NavLink to="/summary" className={linkClass}>
             Summary
           </NavLink>
-          <NavLink to="/ar" className={linkClass}>
-            AR Mode
-          </NavLink>
           <NavLink to="/tool-tracker" className={linkClass}>
             Tool Tracker
           </NavLink>

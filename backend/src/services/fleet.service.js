@@ -103,40 +103,183 @@ const createComponent = (
 
 // Default component data used by each bus
 const defaultComponents = [
-  createComponent("engine", "Engine", "Cog", "Good", "2025-11-15", "2026-01-10", "2024-06-01", 85, [
-    { id: "e1", date: "2026-01-10", type: "service", description: "Oil change and filter replacement", technician: "Mike R." },
-    { id: "e2", date: "2025-11-15", type: "repair", description: "Fixed minor oil leak at gasket", technician: "Sarah K." }
-  ], ["Locate the engine compartment at the front of the bus", "Open the hood latch on the driver side", "Inspect belt tension and oil levels", "Check coolant reservoir level", "Inspect air filter condition"]),
+  createComponent("engine", "Engine", "Cog", "Good", "2025-11-15", "2026-01-10", "2024-06-01", 85, [], [
+    "Locate the engine compartment at the front of the bus",
+    "Open the hood latch on the driver side",
+    "Inspect belt tension and oil levels",
+    "Check coolant reservoir level",
+    "Inspect air filter condition"
+  ]),
 
-  createComponent("brakes", "Brakes", "Disc", "Due Soon", "2025-12-20", "2026-01-05", "2025-03-15", 45, [
-    { id: "b1", date: "2026-01-05", type: "service", description: "Brake pad inspection - 40% remaining", technician: "Mike R." },
-    { id: "b2", date: "2025-12-20", type: "repair", description: "Replaced rear brake caliper", technician: "James T." }
-  ], ["Locate brake assembly behind each wheel", "Remove wheel to access brake pads", "Measure pad thickness with calipers", "Inspect rotor surface for scoring", "Check brake fluid level in reservoir"]),
+  createComponent("brakes", "Brakes", "Disc", "Due Soon", "2025-12-20", "2026-01-05", "2025-03-15", 45, [], [
+    "Locate brake assembly behind each wheel",
+    "Remove wheel to access brake pads",
+    "Measure pad thickness with calipers",
+    "Inspect rotor surface for scoring",
+    "Check brake fluid level in reservoir"
+  ]),
 
-  createComponent("tires", "Tires", "Circle", "Good", "2025-10-01", "2026-02-15", "2025-08-20", 72, [
-    { id: "t1", date: "2026-02-15", type: "service", description: "Tire rotation and pressure check", technician: "Sarah K." }
-  ], ["Check tire pressure using gauge - target 100 PSI", "Inspect tread depth with penny test", "Look for sidewall damage or bulging", "Check valve stems for leaks", "Verify lug nut torque"]),
+  createComponent("tires", "Tires", "Circle", "Good", "2025-10-01", "2026-02-15", "2025-08-20", 72, [], [
+    "Check tire pressure using gauge - target 100 PSI",
+    "Inspect tread depth with penny test",
+    "Look for sidewall damage or bulging",
+    "Check valve stems for leaks",
+    "Verify lug nut torque"
+  ]),
 
-  createComponent("battery", "Battery", "Battery", "Good", "2025-09-10", "2026-02-01", "2025-09-10", 90, [
-    { id: "ba1", date: "2026-02-01", type: "service", description: "Battery load test - passed", technician: "James T." }
-  ], ["Locate battery compartment on driver side", "Check terminal connections for corrosion", "Test voltage with multimeter - target 12.6V", "Inspect battery case for damage", "Clean terminals with baking soda solution"]),
+  createComponent("battery", "Battery", "Battery", "Good", "2025-09-10", "2026-02-01", "2025-09-10", 90, [], [
+    "Locate battery compartment on driver side",
+    "Check terminal connections for corrosion",
+    "Test voltage with multimeter - target 12.6V",
+    "Inspect battery case for damage",
+    "Clean terminals with baking soda solution"
+  ]),
 
-  createComponent("suspension", "Suspension", "ArrowUpDown", "Good", "2025-08-15", "2026-01-20", "2024-12-01", 78, [
-    { id: "s1", date: "2026-01-20", type: "service", description: "Suspension inspection - all good", technician: "Mike R." }
-  ], ["Inspect shock absorbers for leaks", "Check air bag suspension pressure", "Test ride height at each corner", "Inspect bushings for wear", "Check stabilizer bar links"]),
+  createComponent("suspension", "Suspension", "ArrowUpDown", "Good", "2025-08-15", "2026-01-20", "2024-12-01", 78, [], [
+    "Inspect shock absorbers for leaks",
+    "Check air bag suspension pressure",
+    "Test ride height at each corner",
+    "Inspect bushings for wear",
+    "Check stabilizer bar links"
+  ]),
 
-  createComponent("cooling", "Cooling System", "Thermometer", "Due Soon", "2025-11-01", "2026-01-15", "2024-09-01", 52, [
-    { id: "c1", date: "2026-01-15", type: "service", description: "Coolant flush recommended at next service", technician: "Sarah K." }
-  ], ["Check coolant level in expansion tank", "Inspect radiator for leaks or damage", "Test thermostat operation", "Check all hose connections", "Inspect water pump for weeping"]),
+  createComponent("cooling", "Cooling System", "Thermometer", "Due Soon", "2025-11-01", "2026-01-15", "2024-09-01", 52, [], [
+    "Check coolant level in expansion tank",
+    "Inspect radiator for leaks or damage",
+    "Test thermostat operation",
+    "Check all hose connections",
+    "Inspect water pump for weeping"
+  ]),
 
-  createComponent("transmission", "Transmission", "Settings", "Good", "2025-07-20", "2026-02-10", "2024-03-15", 80, [
-    { id: "tr1", date: "2026-02-10", type: "service", description: "Transmission fluid level check", technician: "James T." }
-  ], ["Check transmission fluid level and color", "Inspect for leaks at pan gasket", "Test shift quality through all gears", "Check linkage adjustment", "Inspect CV joints and boots"]),
+  createComponent("transmission", "Transmission", "Settings", "Good", "2025-07-20", "2026-02-10", "2024-03-15", 80, [], [
+    "Check transmission fluid level and color",
+    "Inspect for leaks at pan gasket",
+    "Test shift quality through all gears",
+    "Check linkage adjustment",
+    "Inspect CV joints and boots"
+  ]),
 
-  createComponent("electrical", "Electrical Systems", "Zap", "Urgent", "2026-02-28", "2026-02-28", "2025-06-01", 25, [
-    { id: "el1", date: "2026-02-28", type: "repair", description: "Intermittent headlight failure - investigating", technician: "Mike R." }
-  ], ["Check all exterior lighting", "Test turn signals and hazard lights", "Inspect wiring harness for damage", "Check fuse box for blown fuses", "Test alternator output"])
+  createComponent("electrical", "Electrical Systems", "Zap", "Urgent", "2026-02-28", "2026-02-28", "2025-06-01", 25, [], [
+    "Check all exterior lighting",
+    "Test turn signals and hazard lights",
+    "Inspect wiring harness for damage",
+    "Check fuse box for blown fuses",
+    "Test alternator output"
+  ])
 ];
+
+// Mock maintenance history templates for each component.
+// Each component has 6 possible history records.
+// Tech 1 and Tech 2 carry out maintenance work.
+// Manager only carries out inspection-style work.
+const componentHistoryTemplates = {
+  engine: [
+    { type: "service", description: "Oil change and filter replacement", technician: "Tech 1", notes: "Oil levels restored and filter replaced." },
+    { type: "repair", description: "Fixed minor oil leak at gasket", technician: "Tech 2", notes: "Leak cleaned, sealed and monitored after repair." },
+    { type: "inspection", description: "Manager inspection of engine bay condition", technician: "Manager", notes: "No active safety concerns identified." },
+    { type: "service", description: "Engine belt tension checked and adjusted", technician: "Tech 1", notes: "Belt tension corrected to manufacturer guidance." },
+    { type: "repair", description: "Replaced worn engine mounting bracket", technician: "Tech 2", notes: "Mounting bracket replaced and vibration reduced." },
+    { type: "inspection", description: "Manager review of engine service history", technician: "Manager", notes: "Service history reviewed and accepted." }
+  ],
+
+  brakes: [
+    { type: "service", description: "Brake pad inspection completed", technician: "Tech 1", notes: "Brake pads checked and wear recorded." },
+    { type: "repair", description: "Replaced rear brake caliper", technician: "Tech 2", notes: "Rear caliper replaced and brake response tested." },
+    { type: "inspection", description: "Manager inspection of brake service records", technician: "Manager", notes: "Brake wear trend reviewed." },
+    { type: "service", description: "Brake fluid level checked and topped up", technician: "Tech 1", notes: "Brake fluid restored to correct level." },
+    { type: "replacement", description: "Front brake pads replaced", technician: "Tech 2", notes: "New brake pads fitted and tested." },
+    { type: "inspection", description: "Manager brake safety inspection completed", technician: "Manager", notes: "Braking system marked for continued monitoring." }
+  ],
+
+  tires: [
+    { type: "service", description: "Tyre pressure and tread depth check completed", technician: "Tech 2", notes: "Tyres checked against depot safety requirements." },
+    { type: "inspection", description: "Manager inspection of tyre wear records", technician: "Manager", notes: "Tread wear within acceptable depot limits." },
+    { type: "repair", description: "Repaired slow leak on rear nearside tyre", technician: "Tech 1", notes: "Leak repaired and tyre pressure retested." },
+    { type: "replacement", description: "Replaced two rear tyres due to tread wear", technician: "Tech 2", notes: "Rear tyres replaced and logged." },
+    { type: "service", description: "Tyre rotation completed", technician: "Tech 1", notes: "Tyres rotated to balance wear." },
+    { type: "inspection", description: "Manager tyre condition inspection completed", technician: "Manager", notes: "Tyre condition acceptable for continued operation." }
+  ],
+
+  battery: [
+    { type: "service", description: "Battery load test completed", technician: "Tech 1", notes: "Battery passed load test." },
+    { type: "inspection", description: "Manager inspection of battery replacement records", technician: "Manager", notes: "Battery lifecycle documentation confirmed." },
+    { type: "replacement", description: "Battery replaced after low voltage readings", technician: "Tech 2", notes: "Replacement battery tested successfully." },
+    { type: "service", description: "Battery terminals cleaned and protected", technician: "Tech 1", notes: "Terminals cleaned and corrosion protection applied." },
+    { type: "repair", description: "Battery cable connection repaired", technician: "Tech 2", notes: "Loose cable connection repaired." },
+    { type: "inspection", description: "Manager review of battery health records", technician: "Manager", notes: "Battery performance records reviewed." }
+  ],
+
+  suspension: [
+    { type: "service", description: "Suspension inspection completed", technician: "Tech 2", notes: "Suspension checked with no immediate repair required." },
+    { type: "inspection", description: "Manager inspection of ride height records", technician: "Manager", notes: "Ride height records reviewed." },
+    { type: "repair", description: "Adjusted suspension linkage after uneven ride height", technician: "Tech 1", notes: "Suspension linkage adjusted successfully." },
+    { type: "service", description: "Shock absorbers checked for leaks", technician: "Tech 2", notes: "No major leaks detected." },
+    { type: "replacement", description: "Suspension bushing replaced", technician: "Tech 1", notes: "Worn bushing replaced and road response checked." },
+    { type: "inspection", description: "Manager suspension safety inspection completed", technician: "Manager", notes: "Suspension records accepted." }
+  ],
+
+  cooling: [
+    { type: "service", description: "Coolant level and condition checked", technician: "Tech 1", notes: "Coolant condition checked and topped up." },
+    { type: "inspection", description: "Manager inspection of cooling service history", technician: "Manager", notes: "Cooling system marked for follow-up service planning." },
+    { type: "repair", description: "Repaired minor coolant hose seepage", technician: "Tech 2", notes: "Hose seepage repaired and pressure tested." },
+    { type: "replacement", description: "Replaced coolant reservoir cap", technician: "Tech 1", notes: "Reservoir cap replaced." },
+    { type: "service", description: "Radiator condition check completed", technician: "Tech 2", notes: "Radiator inspected for damage and leaks." },
+    { type: "inspection", description: "Manager cooling system inspection completed", technician: "Manager", notes: "Cooling system records reviewed." }
+  ],
+
+  transmission: [
+    { type: "service", description: "Transmission fluid level check completed", technician: "Tech 2", notes: "Fluid level checked and recorded." },
+    { type: "inspection", description: "Manager inspection of transmission service records", technician: "Manager", notes: "No abnormal service trend identified." },
+    { type: "repair", description: "Adjusted transmission linkage for smoother gear selection", technician: "Tech 1", notes: "Linkage adjusted and shift response tested." },
+    { type: "service", description: "Transmission pan checked for leakage", technician: "Tech 2", notes: "No major leaks found." },
+    { type: "replacement", description: "Transmission filter replaced", technician: "Tech 1", notes: "Filter replaced during service check." },
+    { type: "inspection", description: "Manager transmission condition review completed", technician: "Manager", notes: "Transmission documentation reviewed." }
+  ],
+
+  electrical: [
+    { type: "repair", description: "Intermittent headlight failure investigated", technician: "Tech 1", notes: "Lighting circuit tested and fault isolated." },
+    { type: "inspection", description: "Manager inspection of electrical fault records", technician: "Manager", notes: "Recurring lighting issue flagged for technician follow-up." },
+    { type: "repair", description: "Repaired loose wiring harness connector", technician: "Tech 2", notes: "Connector repaired and secured." },
+    { type: "replacement", description: "Replaced faulty lighting control relay", technician: "Tech 1", notes: "Relay replaced and lighting retested." },
+    { type: "service", description: "Exterior lighting system tested", technician: "Tech 2", notes: "Lights tested and operational status recorded." },
+    { type: "inspection", description: "Manager electrical safety inspection completed", technician: "Manager", notes: "Electrical service records reviewed." }
+  ]
+};
+
+// Gives each bus 1–3 relevant history entries per component.
+// The selected entries vary by bus and component so reports do not all look identical.
+const generateComponentHistoryForBus = (busId, busIndex, componentId, componentIndex) => {
+  const templates = componentHistoryTemplates[componentId] || [];
+  const entryCount = ((busIndex + componentIndex) % 3) + 1;
+
+  return Array.from({ length: entryCount }, (_, entryIndex) => {
+    const templateIndex = (busIndex + componentIndex + entryIndex) % templates.length;
+    const template = templates[templateIndex];
+
+    return {
+      id: `${busId}-${componentId}-history-${entryIndex + 1}`,
+      date: `2026-${String(((busIndex + entryIndex) % 5) + 1).padStart(2, "0")}-${String(10 + ((busIndex + componentIndex + entryIndex) % 18)).padStart(2, "0")}`,
+      type: template.type,
+      description: template.description,
+      technician: template.technician,
+      notes: template.notes
+    };
+  });
+};
+
+// Applies generated maintenance history to every component on every bus
+const applyGeneratedHistoryToBus = (bus, busIndex) => ({
+  ...bus,
+  components: bus.components.map((component, componentIndex) => ({
+    ...component,
+    history: generateComponentHistoryForBus(
+      bus.id,
+      busIndex,
+      component.id,
+      componentIndex
+    )
+  }))
+});
 
 // Helper function to customise component data for each bus
 const adjustComponents = (components, overrides) => {
@@ -150,7 +293,7 @@ const adjustComponents = (components, overrides) => {
 };
 
 // Temporary mock fleet data
-const fleet = [
+let fleet = [
   {
     id: "bus-001",
     name: "BCP Bus 1",
@@ -417,6 +560,9 @@ const fleet = [
     })
   }
 ];
+
+// Apply generated component-specific maintenance history to the fleet
+fleet = fleet.map(applyGeneratedHistoryToBus);
 
 // GET all buses
 exports.getAllBuses = async () => {
