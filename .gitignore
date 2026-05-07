@@ -1,2 +1,8 @@
 .env
 node_modules/
+certs/
+ca.key
+ca.crt
+*.key
+*.crt
+*.pem

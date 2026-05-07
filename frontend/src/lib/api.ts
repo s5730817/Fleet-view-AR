@@ -126,14 +126,24 @@ const readCachedResponse = async <T>(cacheKey: string) => {
 };
 
 const fetchJson = async (url: string, init?: RequestInit) => {
-  const response = await fetch(url, init);
-  const json = await response.json().catch(() => null);
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 2000);
 
-  if (!response.ok || !json?.success) {
-    throw new Error(json?.error || json?.message || `Request failed (${response.status})`);
+  try {
+    const response = await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+    const json = await response.json().catch(() => null);
+
+    if (!response.ok || !json?.success) {
+      throw new Error(json?.error || json?.message || `Request failed (${response.status})`);
+    }
+
+    return json.data;
+  } finally {
+    window.clearTimeout(timeoutId);
   }
-
-  return json.data;
 };
 
 const fetchWithOfflineCache = async <T>(cacheKey: string, url: string, init?: RequestInit) => {
