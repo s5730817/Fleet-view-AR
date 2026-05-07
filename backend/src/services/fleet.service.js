@@ -64,7 +64,7 @@ const routineServiceOffsetsByBusId = {
 
 const legacyConditionStateMap = {
   Good: "good",
-  "Due Soon": "watch",
+  "Due Soon": "good",
   Urgent: "repair_needed"
 };
 
@@ -151,6 +151,7 @@ const augmentHistoryWithIssues = async (buses) => {
             .map((fault) => ({
               id: `issue:${fault.id}`,
               date: shiftDemoDate(fault.created_at),
+              createdAt: fault.created_at,
               type: "issue",
               description: `Issue logged: ${fault.title}`,
               technician: mockActorNameMap[fault.created_by] || "System",
@@ -165,6 +166,7 @@ const augmentHistoryWithIssues = async (buses) => {
           ).flat().filter(Boolean).map((update) => ({
             id: `update:${update.id}`,
             date: shiftDemoDate(update.created_at),
+            createdAt: update.created_at,
             type: update.update_type,
             description: update.description,
             technician: mockActorNameMap[update.created_by] || "System",
@@ -604,6 +606,88 @@ exports.getARContext = async (id) => {
       markerCode: getToolMarkerCode(toolIndex),
       status: "available",
       depotName
+    }))
+  };
+};
+
+exports.getARCatalog = async () => {
+  const issueTypesByPartCode = {};
+
+  for (const component of defaultComponents) {
+    issueTypesByPartCode[component.id] = getIssueTypeOptionsForPart(component.id, component.arInstructions).map((issueType) => ({
+      id: `mock:${component.id}:${issueType.key}`,
+      ...issueType,
+    }));
+  }
+
+  const depotResourcesById = {
+    "mock-depot-1": {
+      depotId: "mock-depot-1",
+      depotName: "Central Depot",
+      assignableUsers: mockAssignableUsersByDepot[1] || [],
+      tools: defaultToolNames.map((toolName, toolIndex) => ({
+        id: `tool:1:${toolName}`,
+        name: toolName,
+        markerCode: getToolMarkerCode(toolIndex),
+        status: "available",
+        depotName: "Central Depot",
+      })),
+    },
+    "mock-depot-2": {
+      depotId: "mock-depot-2",
+      depotName: "North Depot",
+      assignableUsers: mockAssignableUsersByDepot[2] || [],
+      tools: defaultToolNames.map((toolName, toolIndex) => ({
+        id: `tool:2:${toolName}`,
+        name: toolName,
+        markerCode: getToolMarkerCode(toolIndex),
+        status: "available",
+        depotName: "North Depot",
+      })),
+    },
+  };
+
+  return {
+    issueTypesByPartCode,
+    depotResourcesById,
+  };
+};
+
+exports.getARSnapshot = async (id) => {
+  const busIndex = fleet.findIndex((bus) => bus.id === id);
+  if (busIndex === -1) {
+    return null;
+  }
+
+  const bus = fleet[busIndex];
+  const depotName = busIndex < 9 ? "Central Depot" : "North Depot";
+  const depotSequence = busIndex < 9 ? 1 : 2;
+
+  return {
+    bus: {
+      id: bus.id,
+      name: bus.name,
+      plateNumber: bus.plateNumber,
+      depotId: `mock-depot-${depotSequence}`,
+      depotName,
+      status: deriveBusMaintenanceSummary({
+        nextServiceAt: shiftDemoDate(bus.nextServiceDate),
+        issues: buildMockIssueSummaryInput(bus),
+        components: bus.components.map((component) => ({
+          conditionState: component.conditionState || legacyConditionStateMap[component.status] || "good",
+          lifecycleState: component.lifecycleState || legacyLifecycleStateMap[component.status] || "within_expected_life"
+        }))
+      }).status
+    },
+    parts: bus.components.map((component, componentIndex) => ({
+      ...normalizeMockComponent(component),
+      id: component.id,
+      code: component.id,
+      name: component.name,
+      markerCode: getBusMarkerCode(componentIndex),
+      icon: component.icon,
+      arInstructions: component.arInstructions,
+      activeIssues: []
     }))
   };
 };

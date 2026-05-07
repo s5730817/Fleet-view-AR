@@ -24,14 +24,12 @@ const COMPONENT_OUT_OF_LIFE_STATES = new Set([
 
 const COMPONENT_SEVERITY = {
   good: 0,
-  watch: 1,
   repair_needed: 2,
   replace_recommended: 3
 };
 
 const COMPONENT_STATUS_LABELS = {
   good: "Good",
-  watch: "Watch",
   repair_needed: "Repair Needed",
   replace_recommended: "Replace Recommended"
 };
@@ -53,9 +51,12 @@ const BUS_STATUS_LABELS = {
 
 const COMPONENT_INDICATOR_LABELS = {
   good: "Component health good",
-  watch: "Component needs monitoring",
   repair_needed: "Component repair needed",
   replace_recommended: "Replacement recommended"
+};
+
+const LEGACY_COMPONENT_STATE_ALIASES = {
+  watch: "good"
 };
 
 const LIFECYCLE_SEVERITY = {
@@ -78,7 +79,8 @@ const normalizeComponentState = ({ conditionState, status }) => {
     : typeof status === "string"
     ? status.trim().toLowerCase().replace(/\s+/g, "_")
     : null;
-  return COMPONENT_SEVERITY[normalizedStatus] !== undefined ? normalizedStatus : "good";
+  const canonicalStatus = LEGACY_COMPONENT_STATE_ALIASES[normalizedStatus] || normalizedStatus;
+  return COMPONENT_SEVERITY[canonicalStatus] !== undefined ? canonicalStatus : "good";
 };
 
 const normalizeLifecycleState = ({ lifecycleState }) => {
@@ -377,9 +379,6 @@ const deriveComponentPresentation = ({
   } else if (normalizedLifecycleState === "near_end_of_life") {
     statusState = "requires_attention";
     statusNote = "Near end of life";
-  } else if (normalizedConditionState === "watch") {
-    statusState = "requires_attention";
-    statusNote = "Needs inspection";
   }
 
   return {

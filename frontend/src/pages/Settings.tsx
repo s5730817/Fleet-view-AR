@@ -18,6 +18,7 @@ import {
   Lock,
   Eye,
   EyeOff,
+  Smartphone,
 } from "lucide-react";
 
 const depotOptions = [
@@ -281,6 +282,28 @@ const Settings = () => {
 
             <AccessibilityToggle />
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Smartphone className="h-4 w-4" />
+            Device Setup
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent className="flex items-center justify-between gap-4">
+          <div>
+            <p className="font-medium text-foreground">Prepare a field device for LAN + offline use</p>
+            <p className="text-sm text-muted-foreground">
+              Generate/share the dev certificate, copy the LAN app URL, and walk through the trust setup once.
+            </p>
+          </div>
+
+          <Button variant="outline" onClick={() => navigate("/device-setup")}>
+            Open Device Setup
+          </Button>
         </CardContent>
       </Card>
 

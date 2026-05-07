@@ -276,7 +276,7 @@ CREATE INDEX ON "activity_logs" ("created_at");
 
 COMMENT ON COLUMN "tools"."status" IS 'available | in_use | awaiting_return';
 
-COMMENT ON COLUMN "bus_parts"."condition_state" IS 'good | watch | repair_needed | replace_recommended';
+COMMENT ON COLUMN "bus_parts"."condition_state" IS 'good | repair_needed | replace_recommended';
 
 COMMENT ON COLUMN "bus_parts"."lifecycle_state" IS 'within_expected_life | near_end_of_life | beyond_expected_life | beyond_life_approved';
 

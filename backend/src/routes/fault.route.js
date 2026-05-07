@@ -6,7 +6,7 @@ const {
   validateCreateFault,
   validateUpdateFaultStatus,
   validateAddFaultUpdate,
-} = require("../middleware/faultValidation");
+} = require("../middleware/faultValidation.middleware");
 
 // GET dashboard summary for faults
 router.get("/summary", faultController.getFaultSummary);

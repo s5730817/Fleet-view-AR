@@ -2,11 +2,11 @@ import { useState, useRef, useEffect } from "react";
 import * as THREE from "three";
 import {
   APP_STATES,
-  AR_CAMERA_PARAMS,
   MATRIX_CODE_TYPE,
   TRACK_LOSS_THRESHOLD,
   TRACK_SMOOTHING,
 } from "../constants";
+import { getARCameraParamsUrl } from "@/lib/ar-offline-assets";
 import { lerpVector, slerpQuaternion } from "../arHelpers";
 
 const describeCameraBootstrapError = (error) => {
@@ -172,8 +172,10 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
       };
       window.addEventListener("resize", onResize);
 
+      const cameraParametersUrl = await getARCameraParamsUrl();
+
       const arContext = new window.THREEx.ArToolkitContext({
-        cameraParametersUrl: AR_CAMERA_PARAMS,
+        cameraParametersUrl,
         detectionMode: "mono_and_matrix",
         matrixCodeType: MATRIX_CODE_TYPE,
         canvasWidth: 1280,

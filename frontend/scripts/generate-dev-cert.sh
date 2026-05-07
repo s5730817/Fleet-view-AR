@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euo # pipefail, removed to work on windows.
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 CA_KEY="$ROOT_DIR/ca.key"
@@ -18,7 +18,25 @@ fi
 
 mkdir -p "$CERT_DIR"
 
-HOSTS="${DEV_CERT_HOSTS:-localhost,127.0.0.1,::1}"
+# Cross-platform LAN IP detection (Windows/WSL/Mac/Linux)
+if command -v ipconfig.exe &>/dev/null; then
+  # Windows or WSL - use ipconfig.exe to get real LAN IP
+  LOCAL_IP=$(ipconfig.exe 2>/dev/null \
+    | grep -A 4 "Wireless LAN\|Ethernet adapter" \
+    | grep "IPv4" \
+    | grep -v "169\.254" \
+    | awk '{print $NF}' \
+    | tr -d '\r' \
+    | head -1 || echo "")
+elif command -v ipconfig &>/dev/null; then
+  # Mac
+  LOCAL_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "")
+else
+  # Linux
+  LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "")
+fi
+DEFAULT_HOSTS="localhost,127.0.0.1,::1${LOCAL_IP:+,$LOCAL_IP}"
+HOSTS="${DEV_CERT_HOSTS:-$DEFAULT_HOSTS}"
 IFS=',' read -r -a host_list <<< "$HOSTS"
 
 alt_names=""

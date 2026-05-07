@@ -14,8 +14,14 @@
  *     causing silent detection failures.  We reset them before re-loading.
  */
 import * as THREE from "three";
+import { getOfflineArRuntimeSource, AR_RUNTIME_URL } from "@/lib/ar-offline-assets";
 
-const ARJS_RUNTIME_URL = "/vendor/ar.js";
+const injectInlineArRuntime = (source) => {
+  const script = document.createElement("script");
+  script.dataset.arjsRuntime = "true";
+  script.text = source;
+  document.body.appendChild(script);
+};
 
 const EVENT_DISPATCHER_METHODS = [
   "addEventListener",
@@ -87,7 +93,7 @@ export const loadARjs = async () => {
 
     const existing = document.querySelector("script[data-arjs-runtime='true']");
     if (existing) {
-      if (existing.getAttribute("src") !== ARJS_RUNTIME_URL) {
+      if (existing.getAttribute("src") !== AR_RUNTIME_URL && existing.getAttribute("src") !== null) {
         existing.remove();
       } else {
         existing.addEventListener("load", () => resolve(), { once: true });
@@ -99,8 +105,34 @@ export const loadARjs = async () => {
     resetArjsGlobals();
     window.THREE = createMutableThreeGlobal();
 
+    const loadFromCachedRuntime = async () => {
+      const cachedRuntimeSource = await getOfflineArRuntimeSource();
+
+      if (!cachedRuntimeSource) {
+        window.__arjsLoadingPromise = null;
+        resetArjsGlobals();
+        reject(new Error("Failed to load AR.js runtime."));
+        return;
+      }
+
+      try {
+        injectInlineArRuntime(cachedRuntimeSource);
+
+        if (!window.THREEx?.ArToolkitSource) {
+          throw new Error("AR.js loaded but THREEx.ArToolkitSource is unavailable.");
+        }
+
+        patchArjsRuntime();
+        resolve();
+      } catch (error) {
+        window.__arjsLoadingPromise = null;
+        resetArjsGlobals();
+        reject(error instanceof Error ? error : new Error("Failed to load AR.js runtime."));
+      }
+    };
+
     const script = document.createElement("script");
-    script.src = ARJS_RUNTIME_URL;
+    script.src = AR_RUNTIME_URL;
     script.async = true;
     script.dataset.arjsRuntime = "true";
     script.onload = () => {
@@ -115,9 +147,8 @@ export const loadARjs = async () => {
       resolve();
     };
     script.onerror = () => {
-      window.__arjsLoadingPromise = null;
-      resetArjsGlobals();
-      reject(new Error("Failed to load AR.js runtime."));
+      script.remove();
+      void loadFromCachedRuntime();
     };
     document.body.appendChild(script);
   });

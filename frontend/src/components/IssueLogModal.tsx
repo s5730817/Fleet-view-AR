@@ -12,7 +12,12 @@ import {
 } from "@/components/ui/select";
 import type { ARAssignableUser, ARBusPart, BusComponent } from "@/types/fleet";
 import { AlertTriangle } from "lucide-react";
+import { usePermission } from "@/context/PermissionContext";
 import { toast } from "sonner";
+
+type IssueSubmitResult = {
+  offlinePending?: boolean;
+};
 
 interface IssueLogModalProps {
   open: boolean;
@@ -21,7 +26,7 @@ interface IssueLogModalProps {
   busName: string;
   issuePart: ARBusPart | null;
   assignableUsers: ARAssignableUser[];
-  onIssueSubmit: (componentId: string, input: { issueTypeId: string; assignedUserId?: string; note?: string }) => Promise<void>;
+  onIssueSubmit: (componentId: string, input: { issueTypeId: string; assignedUserId?: string; note?: string }) => Promise<IssueSubmitResult>;
 }
 
 export function IssueLogModal({
@@ -33,6 +38,26 @@ export function IssueLogModal({
   assignableUsers,
   onIssueSubmit,
 }: IssueLogModalProps) {
+  const { role } = usePermission();
+  const engineerAssignees = useMemo(
+    () => assignableUsers.filter((user) => user.role === "engineer"),
+    [assignableUsers]
+  );
+  const currentUser = useMemo(() => {
+    try {
+      const storedUser = JSON.parse(window.localStorage.getItem("user") || "{}");
+      return {
+        id: typeof storedUser?.id === "string" ? storedUser.id : "",
+        name: typeof storedUser?.name === "string" ? storedUser.name : "You",
+      };
+    } catch {
+      return {
+        id: "",
+        name: "You",
+      };
+    }
+  }, []);
+  const isEngineer = role === "engineer";
   const defaultIssueTypeId = issuePart?.issueTypeOptions[0]?.id || "";
   const [issueTypeId, setIssueTypeId] = useState(defaultIssueTypeId);
   const [assignedUserId, setAssignedUserId] = useState<string>("");
@@ -45,9 +70,9 @@ export function IssueLogModal({
     }
 
     setIssueTypeId(issuePart?.issueTypeOptions[0]?.id || "");
-    setAssignedUserId("");
+    setAssignedUserId(isEngineer ? currentUser.id : engineerAssignees[0]?.id || "");
     setNote("");
-  }, [issuePart, open]);
+  }, [currentUser.id, engineerAssignees, isEngineer, issuePart, open]);
 
   const selectedIssueType = useMemo(
     () => issuePart?.issueTypeOptions.find((option) => option.id === issueTypeId) || null,
@@ -60,14 +85,25 @@ export function IssueLogModal({
       return;
     }
 
+    if (!assignedUserId) {
+      toast.error("Choose who the issue should be assigned to");
+      return;
+    }
+
     try {
       setSubmitting(true);
-      await onIssueSubmit(component.id, {
+      const result = await onIssueSubmit(component.id, {
         issueTypeId,
-        assignedUserId: assignedUserId || undefined,
+        assignedUserId,
         note: note.trim() || undefined,
       });
-      toast.success(`Issue logged for ${component.name}`);
+      if (result.offlinePending) {
+        toast.success("Issue queued until sync", {
+          description: "System is offline. This ticket will sync once the device reconnects.",
+        });
+      } else {
+        toast.success(`Issue logged for ${component.name}`);
+      }
       onClose();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to log issue");
@@ -103,23 +139,38 @@ export function IssueLogModal({
                 ))}
               </SelectContent>
             </Select>
+            {!issuePart || issuePart.issueTypeOptions.length === 0 ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Issue options are not available for this component yet. Open this bus online once to cache issue metadata for offline logging.
+              </p>
+            ) : null}
           </div>
 
           <div>
             <Label className="text-xs">Assign To</Label>
-            <Select value={assignedUserId} onValueChange={setAssignedUserId}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Leave unassigned" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="unassigned">Unassigned</SelectItem>
-                {assignableUsers.map((user) => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.name} - {user.role}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {isEngineer ? (
+              <div className="mt-1 rounded-md border bg-background/60 px-3 py-2 text-sm text-foreground">
+                {currentUser.name}
+              </div>
+            ) : (
+              <>
+                <Select value={assignedUserId} onValueChange={setAssignedUserId}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Choose assignee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {engineerAssignees.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name} - {user.role}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {engineerAssignees.length === 0 && (
+                  <p className="mt-1 text-xs text-muted-foreground">No depot engineers are available for assignment.</p>
+                )}
+              </>
+            )}
           </div>
 
           {selectedIssueType && (
@@ -154,7 +205,7 @@ export function IssueLogModal({
 
           <div className="flex gap-2 pt-2">
             <Button variant="outline" onClick={onClose} className="flex-1" disabled={submitting}>Cancel</Button>
-            <Button onClick={handleSubmit} className="flex-1" disabled={submitting || !issueTypeId}>
+            <Button onClick={handleSubmit} className="flex-1" disabled={submitting || !issueTypeId || !assignedUserId}>
               {submitting ? "Saving..." : "Create Issue"}
             </Button>
           </div>

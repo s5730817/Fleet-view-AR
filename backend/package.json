@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "migrate:part-states": "node scripts/migrate-part-states.js",
+    "reset:postgres": "node scripts/reset-postgres.js",
     "seed:postgres": "node scripts/seed-postgres.js",
     "start": "node src/server.js",
     "test": "jest"

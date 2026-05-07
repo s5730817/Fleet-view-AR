@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AccessibilityProvider } from "@/context/AccessibilityContext";
 import { PermissionProvider } from "@/context/PermissionContext";
+import { SyncStatusProvider } from "@/context/SyncStatusContext";
 import { Navbar } from "@/components/Navbar";
 
 import Index from "./pages/Index.tsx";
@@ -20,6 +21,7 @@ import Notifications from "./pages/Notifications.tsx";
 import Settings from "./pages/Settings.tsx";
 import Summary from "./pages/Summary.tsx";
 import Team from "./pages/Team.tsx";
+import DeviceSetup from "./pages/DeviceSetup.tsx";
 
 
 const queryClient = new QueryClient();
@@ -75,6 +77,7 @@ const AppRoutes = () => {
         <Route path="/team" element={<Team />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/device-setup" element={<DeviceSetup />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>
@@ -100,13 +103,15 @@ const App = () => {
     <AccessibilityProvider>
       <PermissionProvider role={role}>
         <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-              <AppRoutes />
-            </BrowserRouter>
-          </TooltipProvider>
+          <SyncStatusProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                <AppRoutes />
+              </BrowserRouter>
+            </TooltipProvider>
+          </SyncStatusProvider>
         </QueryClientProvider>
       </PermissionProvider>
     </AccessibilityProvider>

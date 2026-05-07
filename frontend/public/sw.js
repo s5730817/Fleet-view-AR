@@ -1,4 +1,4 @@
-const CACHE_NAME = 'transitlens-v1';
+const CACHE_NAME = 'transitlens-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -6,6 +6,8 @@ const STATIC_ASSETS = [
   '/transitlens-192.png',
   '/transitlens-512.png',
   '/transitlens-favicon.png',
+  '/vendor/ar.js',
+  '/vendor/data/camera_para.dat',
 ];
 
 // Install: cache static assets
@@ -26,9 +28,13 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch: network-first for navigation, cache-first for assets
+// Fetch: network-first for navigation, cache-first for static same-origin assets.
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+
+  if (request.method !== 'GET') {
+    return;
+  }
 
   if (request.mode === 'navigate') {
     event.respondWith(
@@ -40,6 +46,10 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => caches.match('/index.html'))
     );
+    return;
+  }
+
+  if (request.url.includes('/api/')) {
     return;
   }
 
@@ -63,6 +73,5 @@ self.addEventListener('sync', (event) => {
 });
 
 async function syncMaintenanceLogs() {
-  // Future: read from IndexedDB and POST to server
-  console.log('[SW] Syncing maintenance logs...');
+  console.log('[SW] Sync requested. Window client performs queue replay.');
 }

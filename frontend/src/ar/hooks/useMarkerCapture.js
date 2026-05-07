@@ -1,9 +1,10 @@
 import { useState, useRef } from "react";
 import * as THREE from "three";
 import jsQR from "jsqr";
-import { AR_CAMERA_PARAMS, MATRIX_CODE_TYPE, TRACK_SMOOTHING, TRACK_LOSS_THRESHOLD } from "../constants";
+import { MATRIX_CODE_TYPE, TRACK_SMOOTHING, TRACK_LOSS_THRESHOLD } from "../constants";
 import { loadARjs } from "../arjsLoader";
 import { computeScreenPosition, lerpVector, slerpQuaternion } from "../arHelpers";
+import { getARCameraParamsUrl } from "@/lib/ar-offline-assets";
 
 const TARGET_BOX_RATIO = 0.34;
 const TARGET_BOX_MIN = 150;
@@ -50,8 +51,9 @@ export const useMarkerCapture = () => {
     }
 
     if (!liveArRef.current.initPromise) {
+      const cameraParametersUrl = await getARCameraParamsUrl();
       const context = new window.THREEx.ArToolkitContext({
-        cameraParametersUrl: AR_CAMERA_PARAMS,
+        cameraParametersUrl,
         detectionMode: "mono_and_matrix",
         matrixCodeType: MATRIX_CODE_TYPE,
         canvasWidth: 1280,

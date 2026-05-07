@@ -79,6 +79,37 @@ exports.getPartsForBusIds = async (busIds) => {
   return result.rows;
 };
 
+exports.getPartContextById = async (partId) => {
+  if (!partId) {
+    return null;
+  }
+
+  const result = await db.query(
+    `SELECT
+      bus_parts.id,
+      bus_parts.bus_id,
+      buses.depot_id,
+      depots.name AS depot_name,
+      bus_parts.name,
+      bus_parts.condition_state,
+      bus_parts.lifecycle_state,
+      bus_parts.last_repair_at,
+      bus_parts.last_inspected_at,
+      bus_parts.last_service_at,
+      bus_parts.last_replacement_at,
+      bus_parts.ar_instructions,
+      bus_parts.marker_code,
+      bus_parts.icon_key
+     FROM bus_parts
+     INNER JOIN buses ON buses.id = bus_parts.bus_id
+     LEFT JOIN depots ON depots.id = buses.depot_id
+     WHERE bus_parts.id = $1`,
+    [partId]
+  );
+
+  return result.rows[0] || null;
+};
+
 exports.getLifecyclePoliciesForPartCodes = async (partCodes) => {
   const normalizedCodes = [...new Set(partCodes.filter(Boolean))];
   if (normalizedCodes.length === 0) {
@@ -223,9 +254,21 @@ exports.reconcilePartConditionFromActiveIssues = async (partId, executor = db) =
   return nextConditionState;
 };
 
-exports.resolveActiveIssuesForPart = async ({ partId, createdBy, note }, executor = db) => {
+exports.resolveActiveIssuesForPart = async ({ partId, createdBy, note, issueIds, approvedBy = null }, executor = db) => {
   if (!partId) {
     return [];
+  }
+
+  const normalizedIssueIds = Array.isArray(issueIds)
+    ? [...new Set(issueIds.filter(Boolean))]
+    : [];
+  const queryParams = [partId, ACTIVE_ISSUE_STATUSES, approvedBy];
+  const issueFilter = normalizedIssueIds.length > 0
+    ? ` AND id = ANY($4::uuid[])`
+    : "";
+
+  if (normalizedIssueIds.length > 0) {
+    queryParams.push(normalizedIssueIds);
   }
 
   const result = await executor.query(
@@ -234,15 +277,18 @@ exports.resolveActiveIssuesForPart = async ({ partId, createdBy, note }, executo
        FROM issues
        WHERE bus_part_id = $1
          AND status = ANY($2::text[])
+         ${issueFilter}
      )
      UPDATE issues AS current_issue
      SET status = 'resolved',
+       approved_by = COALESCE($3::uuid, current_issue.approved_by),
+       approved_at = CASE WHEN $3::uuid IS NOT NULL THEN NOW() ELSE current_issue.approved_at END,
          resolved_at = NOW(),
          updated_at = NOW()
      FROM active_issues
      WHERE current_issue.id = active_issues.id
      RETURNING current_issue.id, active_issues.title, active_issues.status`,
-    [partId, ACTIVE_ISSUE_STATUSES]
+    queryParams
   );
 
   for (const issue of result.rows) {
@@ -265,6 +311,85 @@ exports.resolveActiveIssuesForPart = async ({ partId, createdBy, note }, executo
         createdBy || null,
         note || `Issue resolved through maintenance on ${issue.title || "component"}`,
         issue.status
+      ]
+    );
+  }
+
+  return result.rows;
+};
+
+exports.markIssuesAwaitingApproval = async ({ partId, createdBy, note, issueIds, metadata = null }, executor = db) => {
+  const normalizedIssueIds = Array.isArray(issueIds)
+    ? [...new Set(issueIds.filter(Boolean))]
+    : [];
+
+  if (normalizedIssueIds.length === 0) {
+    return [];
+  }
+
+  const result = await executor.query(
+    `WITH candidate_issues AS (
+       SELECT id, title, status
+       FROM issues
+       WHERE bus_part_id = $1
+         AND id = ANY($2::uuid[])
+         AND status = ANY($3::text[])
+     )
+     UPDATE issues AS current_issue
+     SET status = 'awaiting_approval',
+         resolved_at = NULL,
+         updated_at = NOW()
+     FROM candidate_issues
+     WHERE current_issue.id = candidate_issues.id
+     RETURNING current_issue.id, candidate_issues.title, candidate_issues.status`,
+    [partId, normalizedIssueIds, ACTIVE_ISSUE_STATUSES]
+  );
+
+  for (const issue of result.rows) {
+    await executor.query(
+      `INSERT INTO issue_updates (
+        id,
+        issue_id,
+        created_at,
+        created_by,
+        update_type,
+        description,
+        status_from,
+        status_to,
+        new_issue_id,
+        metadata
+      )
+      VALUES ($1, $2, NOW(), $3, 'status_change', $4, $5, 'awaiting_approval', NULL, $6)`,
+      [
+        randomUUID(),
+        issue.id,
+        createdBy || null,
+        note || `Manager approval requested for maintenance on ${issue.title || "component"}`,
+        issue.status,
+        metadata,
+      ]
+    );
+
+    await executor.query(
+      `INSERT INTO issue_updates (
+        id,
+        issue_id,
+        created_at,
+        created_by,
+        update_type,
+        description,
+        status_from,
+        status_to,
+        new_issue_id,
+        metadata
+      )
+      VALUES ($1, $2, NOW(), $3, 'comment', $4, NULL, NULL, NULL, $5)`,
+      [
+        randomUUID(),
+        issue.id,
+        createdBy || null,
+        note || `Manager approval requested for maintenance on ${issue.title || "component"}`,
+        metadata,
       ]
     );
   }
@@ -301,7 +426,8 @@ exports.getIssuesForPartIds = async (partIds) => {
       assignee.name AS assigned_to_name,
       assignee.email AS assigned_to_email,
       assignee_role.name AS assigned_to_role,
-      latest_comment.description AS latest_comment
+      latest_comment.description AS latest_comment,
+      latest_approval_request.metadata AS maintenance_approval_metadata
      FROM issues
      LEFT JOIN issue_types ON issue_types.id = issues.issue_type_id
      LEFT JOIN LATERAL (
@@ -321,6 +447,14 @@ exports.getIssuesForPartIds = async (partIds) => {
        ORDER BY issue_updates.created_at DESC
        LIMIT 1
      ) AS latest_comment ON TRUE
+     LEFT JOIN LATERAL (
+       SELECT metadata
+       FROM issue_updates
+       WHERE issue_updates.issue_id = issues.id
+         AND issue_updates.metadata ->> 'kind' = 'maintenance_approval_request'
+       ORDER BY issue_updates.created_at DESC
+       LIMIT 1
+     ) AS latest_approval_request ON TRUE
      WHERE issues.bus_part_id = ANY($1::uuid[])
      ORDER BY issues.created_at DESC`,
     [partIds]
