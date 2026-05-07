@@ -8,6 +8,7 @@ const fleetRoutes = require("./routes/fleet.route");
 const jobRoutes = require("./routes/job.route");
 const summaryRoutes = require("./routes/summary.route");
 const teamRoutes = require("./routes/team.route");
+const notificationRoutes = require("./routes/notification.route");
 const { protect } = require("./middleware/auth.middleware");
 const apiLimiter = require('./middleware/rateLimiter.middleware');
 
@@ -35,6 +36,13 @@ app.use("/api/jobs", protect, jobRoutes);
 app.use("/api/summary", protect, summaryRoutes);
 
 // Health check
+// Team routes
+app.use("/api/team", protect, teamRoutes);
+
+// Notification routes
+app.use("/api/notifications", protect, notificationRoutes);
+
+// Test route
 app.get("/", (req, res) => {
   res.json({ message: "AR Maintenance Backend is running" });
 });

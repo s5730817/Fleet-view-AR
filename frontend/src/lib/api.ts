@@ -911,3 +911,64 @@ export const getTeamMembers = async (): Promise<TeamMember[]> => {
 
   return json.data;
 };
+
+export type NotificationType =
+  | "fault"
+  | "maintenance_completed"
+  | "maintenance_due"
+  | "job_assigned"
+  | "overdue"
+  | "system";
+
+export type AppNotification = {
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  time: string;
+  unread: boolean;
+};
+
+export const getNotifications = async (): Promise<AppNotification[]> => {
+  const res = await fetch(`${API_URL}/notifications`, {
+    headers: getAuthHeaders(),
+  });
+
+  const json = await res.json();
+
+  if (!json.success) {
+    throw new Error(json.error || "Failed to fetch notifications");
+  }
+
+  return json.data;
+};
+
+export const markNotificationAsRead = async (notificationId: string) => {
+  const res = await fetch(`${API_URL}/notifications/${notificationId}/read`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+
+  const json = await res.json();
+
+  if (!json.success) {
+    throw new Error(json.error || "Failed to mark notification as read");
+  }
+
+  return json;
+};
+
+export const markNotificationsAsRead = async () => {
+  const res = await fetch(`${API_URL}/notifications/read-all`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+
+  const json = await res.json();
+
+  if (!json.success) {
+    throw new Error(json.error || "Failed to mark notifications as read");
+  }
+
+  return json;
+};
