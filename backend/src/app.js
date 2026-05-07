@@ -14,7 +14,7 @@ const apiLimiter = require('./middleware/rateLimiter.middleware');
 const app = express();
 
 // Trust proxy (required if behind Nginx, Railway, Render, AWS, etc.)
-app.set('trust proxy', 1);
+//app.set('trust proxy', 1);
 
 // Global middleware
 app.use(cors());
