@@ -508,34 +508,45 @@ export const getCachedFleetSnapshot = async () => {
   return (await getCachedValue<Bus[]>(buildUserScopedCacheKey("fleet"))) || [];
 };
 
+export type SummaryPeriod = "week" | "month" | "3months" | "6months" | "year";
+
 export type SummaryData = {
+  period: SummaryPeriod;
+  periodLabel: string;
+
   summaryStats: {
     created: number;
     completed: number;
     completionRate: string;
     overdue: number;
   };
+
   createdCompletedData: {
     date: string;
     created: number;
     completed: number;
   }[];
+
   fleetConditionData: {
     name: string;
     value: number;
   }[];
+
   onTimeOverdueData: {
     name: string;
     value: number;
   }[];
+
   jobsByStatusData: {
     status: string;
     value: number;
   }[];
 };
 
-export const getSummary = async (): Promise<SummaryData> => {
-  const res = await fetch(`${API_URL}/summary`, {
+export const getSummary = async (
+  period: SummaryPeriod = "week"
+): Promise<SummaryData> => {
+  const res = await fetch(`${API_URL}/summary?period=${period}`, {
     headers: getAuthHeaders(),
   });
 
