@@ -66,7 +66,9 @@ export const downloadMaintenanceReportPdf = async (report: ReportTarget) => {
   doc.setFontSize(10);
   doc.setTextColor(90, 90, 90);
   doc.text(
-    `${report.buses.length} ${report.buses.length === 1 ? "bus" : "buses"} included`,
+    `${report.buses.length} ${
+      report.buses.length === 1 ? "bus" : "buses"
+    } included`,
     14,
     y
   );
@@ -91,8 +93,11 @@ export const downloadMaintenanceReportPdf = async (report: ReportTarget) => {
     doc.text(`${bus.year} ${bus.model}`, 20, y + 16);
     doc.text(`Status: ${bus.status}`, 20, y + 23);
     doc.text(`Mileage: ${bus.mileage.toLocaleString()}`, 80, y + 23);
+
     doc.text(
-      `Next Service: ${new Date(bus.nextServiceDate).toLocaleDateString()}`,
+      `Next Service: ${new Date(
+        bus.nextServiceDate
+      ).toLocaleDateString()}`,
       135,
       y + 23
     );
@@ -108,8 +113,11 @@ export const downloadMaintenanceReportPdf = async (report: ReportTarget) => {
 
       doc.setFontSize(8);
       doc.setTextColor(90, 90, 90);
+
       doc.text(
-        `Status: ${component.status} · Health: ${component.healthPercent}% · Last Service: ${new Date(
+        `Status: ${component.status} · Condition: ${
+          component.conditionLabel
+        } · Last Service: ${new Date(
           component.lastService
         ).toLocaleDateString()}`,
         14,
@@ -130,7 +138,10 @@ export const downloadMaintenanceReportPdf = async (report: ReportTarget) => {
           );
 
           const noteLines = entry.notes
-            ? doc.splitTextToSize(`Notes: ${entry.notes}`, pageWidth - 50)
+            ? doc.splitTextToSize(
+                `Notes: ${entry.notes}`,
+                pageWidth - 50
+              )
             : [];
 
           const boxHeight =
@@ -140,14 +151,24 @@ export const downloadMaintenanceReportPdf = async (report: ReportTarget) => {
 
           doc.setFillColor(255, 255, 255);
           doc.setDrawColor(230, 230, 230);
-          doc.roundedRect(18, y, pageWidth - 36, boxHeight, 2, 2, "FD");
+
+          doc.roundedRect(
+            18,
+            y,
+            pageWidth - 36,
+            boxHeight,
+            2,
+            2,
+            "FD"
+          );
 
           doc.setFontSize(8);
           doc.setTextColor(90, 90, 90);
+
           doc.text(
-            `${new Date(entry.date).toLocaleDateString()} · ${entry.type} · ${
-              entry.technician
-            }`,
+            `${new Date(entry.date).toLocaleDateString()} · ${
+              entry.type
+            } · ${entry.technician}`,
             22,
             y + 5
           );
@@ -159,7 +180,12 @@ export const downloadMaintenanceReportPdf = async (report: ReportTarget) => {
           if (entry.notes) {
             doc.setFontSize(8);
             doc.setTextColor(90, 90, 90);
-            doc.text(noteLines, 22, y + 11 + descriptionLines.length * 5);
+
+            doc.text(
+              noteLines,
+              22,
+              y + 11 + descriptionLines.length * 5
+            );
           }
 
           y += boxHeight + 4;
@@ -186,9 +212,14 @@ export const downloadMaintenanceReportPdf = async (report: ReportTarget) => {
       pageHeight - 10
     );
 
-    doc.text(`Page ${page} of ${pageCount}`, pageWidth - 34, pageHeight - 10);
+    doc.text(
+      `Page ${page} of ${pageCount}`,
+      pageWidth - 34,
+      pageHeight - 10
+    );
   }
 
   const fileName = report.title.toLowerCase().replace(/\s+/g, "-");
+
   doc.save(`${fileName}.pdf`);
 };

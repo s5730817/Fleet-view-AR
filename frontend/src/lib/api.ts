@@ -508,10 +508,44 @@ export const getCachedFleetSnapshot = async () => {
   return (await getCachedValue<Bus[]>(buildUserScopedCacheKey("fleet"))) || [];
 };
 
-export const getSummary = async () => {
-  return fetchWithOfflineCache(buildUserScopedCacheKey("summary"), `${API_URL}/summary`, {
+export type SummaryData = {
+  summaryStats: {
+    created: number;
+    completed: number;
+    completionRate: string;
+    overdue: number;
+  };
+  createdCompletedData: {
+    date: string;
+    created: number;
+    completed: number;
+  }[];
+  fleetConditionData: {
+    name: string;
+    value: number;
+  }[];
+  onTimeOverdueData: {
+    name: string;
+    value: number;
+  }[];
+  jobsByStatusData: {
+    status: string;
+    value: number;
+  }[];
+};
+
+export const getSummary = async (): Promise<SummaryData> => {
+  const res = await fetch(`${API_URL}/summary`, {
     headers: getAuthHeaders(),
   });
+
+  const json = await res.json();
+
+  if (!json.success) {
+    throw new Error(json.error || "Failed to fetch summary");
+  }
+
+  return json.data;
 };
 
 // Verify 2FA code
