@@ -1,4 +1,4 @@
-const CACHE_NAME = 'transitlens-v3';
+const CACHE_NAME = 'transitlens-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -28,39 +28,46 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch: network-first for navigation, cache-first for static same-origin assets.
+// Fetch: cache-first for everything except API calls
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
-  if (request.method !== 'GET') {
-    return;
-  }
+  if (request.method !== 'GET') return;
 
+  // Never cache API calls
+  if (request.url.includes('/api/')) return;
+
+  // Navigation requests - serve index.html from cache or network
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
+      caches.match('/index.html').then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((response) => {
           const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', clone));
           return response;
-        })
-        .catch(() => caches.match('/index.html'))
+        });
+      })
     );
     return;
   }
 
-  if (request.url.includes('/api/')) {
-    return;
-  }
-
+  // Everything else: cache-first, fall back to network and cache result
   event.respondWith(
     caches.match(request).then((cached) => {
-      const fetched = fetch(request).then((response) => {
+      if (cached) return cached;
+      return fetch(request).then((response) => {
+        // Only cache valid responses
+        if (!response || response.status !== 200 || response.type === 'opaque') {
+          return response;
+        }
         const clone = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         return response;
       });
-      return cached || fetched;
+    }).catch(() => {
+      // If both cache and network fail, return nothing
+      return new Response('Offline', { status: 503 });
     })
   );
 });

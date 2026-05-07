@@ -65,7 +65,10 @@ Use this if you want live buses, issues, tools, assignments, and AR history stor
 1. Create the local database and user:
 
 ```bash
+#linux
 sudo -u postgres psql
+#windows 
+psql -U postgres
 ```
 
 Inside `psql`:
@@ -99,7 +102,14 @@ PGPASSWORD=admin-pgr-db77
 4. Apply the schema from the repo root:
 
 ```bash
+#linux
 PGPASSWORD=admin-pgr-db77 psql -h localhost -U admin -d fleetar -f database/db_pstgr.sql
+
+#windows
+psql -h localhost -U admin -d fleetar -f database/db_pstgr.sql
+
+#password may not show in terminal, copy, paste and enter.
+admin-pgr-db77
 ```
 
 5. Seed the demo data:
@@ -133,40 +143,58 @@ cd frontend
 npm run dev
 ```
 
-## HTTPS For AR Testing
+## HTTPS Certificate Setup
 
-If you are testing AR on a phone or need camera access over HTTPS, use the HTTPS frontend mode.
+### 1. Create the CA (once per machine)
 
-1. Create a local CA once per machine in `frontend/`:
+Run from the `frontend/` directory:
 
 ```bash
-cd frontend
 openssl genrsa -out ca.key 2048
 openssl req -x509 -new -nodes -key ca.key -sha256 -days 3650 -out ca.crt -subj "/CN=Fleet View AR Dev CA"
 ```
 
-2. Generate the dev server certificate:
+### 2. Generate the dev certificate
 
 ```bash
-cd frontend
 npm run cert:dev
 ```
 
-If you need LAN access, include your machine IP:
+This auto-detects your LAN IP and generates a certificate for:
+- `localhost`
+- `127.0.0.1`
+- `::1`
+- Your LAN IP (e.g. `192.168.1.x`)
+
+### 3. Trust the CA on your machine
+
+**Windows:**
+1. Press `Win + R`, type `certmgr.msc`, hit Enter
+2. Go to **Trusted Root Certification Authorities** → **Certificates**
+3. Right click → **All Tasks** → **Import**
+4. Browse to `frontend/ca.crt` and import it
+5. Restart Chrome
+
+**Mac:**
+1. Double click `frontend/ca.crt`
+2. Open Keychain Access
+3. Find the cert, double click it
+4. Expand **Trust** and set to **Always Trust**
+
+### 4. Start the frontend over HTTPS
 
 ```bash
-cd frontend
-DEV_CERT_HOSTS=localhost,127.0.0.1,::1,<LAN-machine-IP> npm run cert:dev
-```
-
-3. Trust `frontend/ca.crt` on the device you are testing with.
-
-4. Start the frontend over HTTPS:
-
-```bash
-cd frontend
 npm run dev:https
 ```
+
+Access the app at `https://localhost:8080` or `https://<your-LAN-IP>:8080`
+
+### Trusting on Android (for AR testing)
+
+1. Copy `frontend/ca.crt` to your phone via google drive
+2. Go to **Settings** → **Security** → **Install a certificate** → **CA Certificate**
+3. Select `ca.crt` and install it
+4. Access via `https://<your-LAN-IP>:8080` in Chrome
 
 ## Partial Offline Mode
 

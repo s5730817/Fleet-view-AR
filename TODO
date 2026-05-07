@@ -3,3 +3,6 @@
 [] - Add "Reject" button to managers approval tab (for fixes logged from offline)
 [] - Simplify UI
 [] - Document how offline flow works
+[] - Resolve cache on start up of PWA for offling application. 
+[] - NO 2FA in DB server dev. 
+[] - Test suite (Log in, 2FA, Get api's, post/patch api's, validation & security) - AR unsure what to test currently.
