@@ -1,8 +1,12 @@
 // This file defines all fault-related API routes.
-
 const express = require("express");
 const router = express.Router();
 const faultController = require("../controllers/fault.controller");
+const {
+  validateCreateFault,
+  validateUpdateFaultStatus,
+  validateAddFaultUpdate,
+} = require("../middleware/faultValidation");
 
 // GET dashboard summary for faults
 router.get("/summary", faultController.getFaultSummary);
@@ -14,15 +18,20 @@ router.get("/", faultController.getAllFaults);
 router.get("/:id", faultController.getFaultById);
 
 // CREATE a new fault
-router.post("/", faultController.createFault);
+router.post("/", validateCreateFault, faultController.createFault);
 
 // UPDATE a fault's status
-router.patch("/:id/status", faultController.updateFaultStatus);
+router.patch("/:id/status", validateUpdateFaultStatus, faultController.updateFaultStatus);
 
 // GET all updates for one fault
 router.get("/:id/updates", faultController.getFaultUpdates);
 
 // CREATE a new update for one fault
-router.post("/:id/updates", faultController.addFaultUpdate);
+router.post("/:id/updates", validateAddFaultUpdate, faultController.addFaultUpdate);
 
 module.exports = router;
+
+
+
+
+
