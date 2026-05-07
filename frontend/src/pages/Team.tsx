@@ -1,66 +1,20 @@
+import { useQuery } from "@tanstack/react-query";
 import {
   Users,
   Mail,
   Phone,
-  Building2,
   Shield,
   Circle,
 } from "lucide-react";
 
+import {
+  getTeamMembers,
+  type TeamMember,
+  type TeamRole,
+  type TeamStatus,
+} from "@/lib/api";
+
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-
-type TeamRole = "Admin" | "Supervisor" | "Technician";
-type TeamStatus = "Active" | "On Job" | "Offline";
-
-interface TeamMember {
-  id: number;
-  name: string;
-  role: TeamRole;
-  depot: string;
-  email: string;
-  phone: string;
-  status: TeamStatus;
-}
-
-const teamMembers: TeamMember[] = [
-  {
-    id: 1,
-    name: "Alex Morgan",
-    role: "Admin",
-    depot: "Depot 1",
-    email: "alex.morgan@transitlens.co.uk",
-    phone: "07123 456789",
-    status: "Active",
-  },
-  {
-    id: 2,
-    name: "Jamie Carter",
-    role: "Supervisor",
-    depot: "Depot 2",
-    email: "jamie.carter@transitlens.co.uk",
-    phone: "07234 567890",
-    status: "On Job",
-  },
-  {
-    id: 3,
-    name: "Taylor Singh",
-    role: "Technician",
-    depot: "Depot 3",
-    email: "taylor.singh@transitlens.co.uk",
-    phone: "07345 678901",
-    status: "Active",
-  },
-  {
-    id: 4,
-    name: "Morgan Lee",
-    role: "Technician",
-    depot: "Depot 6",
-    email: "morgan.lee@transitlens.co.uk",
-    phone: "07456 789012",
-    status: "Offline",
-  },
-];
 
 const getStatusClass = (status: TeamStatus) => {
   switch (status) {
@@ -77,7 +31,7 @@ const getRoleClass = (role: TeamRole) => {
   switch (role) {
     case "Admin":
       return "bg-primary/10 text-primary border-primary/20";
-    case "Supervisor":
+    case "Manager":
       return "bg-cyan-500/10 text-cyan-500 border-cyan-500/20";
     case "Technician":
       return "bg-green-500/10 text-green-500 border-green-500/20";
@@ -85,6 +39,43 @@ const getRoleClass = (role: TeamRole) => {
 };
 
 const Team = () => {
+  const {
+    data: teamMembers = [],
+    isLoading,
+    error,
+  } = useQuery<TeamMember[]>({
+    queryKey: ["team"],
+    queryFn: getTeamMembers,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <p className="text-lg font-bold text-foreground">Loading team...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <p className="text-lg font-bold text-red-500">Error loading team</p>
+      </div>
+    );
+  }
+
+  const activeCount = teamMembers.filter(
+    (member) => member.status === "Active"
+  ).length;
+
+  const onJobCount = teamMembers.filter(
+    (member) => member.status === "On Job"
+  ).length;
+
+  const technicianCount = teamMembers.filter(
+    (member) => member.role === "Technician"
+  ).length;
+
   return (
     <main className="container max-w-6xl px-4 py-6 space-y-6">
       <section className="rounded-2xl border bg-card p-5 shadow-sm">
@@ -96,7 +87,7 @@ const Team = () => {
           <div>
             <h1 className="text-2xl font-bold text-foreground">Team</h1>
             <p className="text-sm text-muted-foreground">
-              Manage technicians, supervisors and depot assignments
+              View system users, roles and current availability.
             </p>
           </div>
         </div>
@@ -114,16 +105,16 @@ const Team = () => {
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">Active Now</p>
             <p className="mt-2 text-3xl font-bold text-green-500">
-              {teamMembers.filter((member) => member.status === "Active").length}
+              {activeCount}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">On Job</p>
+            <p className="text-sm text-muted-foreground">Technicians</p>
             <p className="mt-2 text-3xl font-bold text-yellow-500">
-              {teamMembers.filter((member) => member.status === "On Job").length}
+              {technicianCount}
             </p>
           </CardContent>
         </Card>
@@ -132,13 +123,17 @@ const Team = () => {
       <section className="rounded-xl border bg-card">
         <div className="flex items-center justify-between border-b px-5 py-4">
           <div>
-            <h2 className="text-lg font-bold text-foreground">Team Directory</h2>
+            <h2 className="text-lg font-bold text-foreground">
+              Team Directory
+            </h2>
             <p className="text-sm text-muted-foreground">
-              Staff contact details and current availability
+              Staff contact details and current availability.
             </p>
           </div>
 
-          <Button>Add Member</Button>
+          <div className="text-sm text-muted-foreground">
+            {onJobCount} currently on job
+          </div>
         </div>
 
         <div className="divide-y">
@@ -149,7 +144,9 @@ const Team = () => {
             >
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-semibold text-foreground">{member.name}</h3>
+                  <h3 className="font-semibold text-foreground">
+                    {member.name}
+                  </h3>
 
                   <span
                     className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-medium ${getRoleClass(
@@ -172,11 +169,6 @@ const Team = () => {
 
                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                   <span className="flex items-center gap-1">
-                    <Building2 className="h-3.5 w-3.5" />
-                    {member.depot}
-                  </span>
-
-                  <span className="flex items-center gap-1">
                     <Mail className="h-3.5 w-3.5" />
                     {member.email}
                   </span>
@@ -188,14 +180,6 @@ const Team = () => {
                 </div>
               </div>
 
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm">
-                  View
-                </Button>
-                <Button variant="outline" size="sm">
-                  Edit
-                </Button>
-              </div>
             </div>
           ))}
         </div>

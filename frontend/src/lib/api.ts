@@ -875,3 +875,29 @@ export const syncPendingOperations = async () => {
   dispatchOfflineSyncEvent({ synced, failed });
   return { synced, failed };
 };
+
+export type TeamRole = "Admin" | "Manager" | "Technician";
+export type TeamStatus = "Active" | "On Job" | "Offline";
+
+export type TeamMember = {
+  id: string;
+  name: string;
+  role: TeamRole;
+  email: string;
+  phone: string;
+  status: TeamStatus;
+};
+
+export const getTeamMembers = async (): Promise<TeamMember[]> => {
+  const res = await fetch(`${API_URL}/team`, {
+    headers: getAuthHeaders(),
+  });
+
+  const json = await res.json();
+
+  if (!json.success) {
+    throw new Error(json.error || "Failed to fetch team members");
+  }
+
+  return json.data;
+};
