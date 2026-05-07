@@ -92,6 +92,9 @@ export function Navbar() {
           <NavLink to="/dashboard" className={linkClass}>
             Dashboard
           </NavLink>
+          <NavLink to="/jobs" className={linkClass}>
+            My Jobs
+          </NavLink>
           <NavLink to="/summary" className={linkClass}>
             Summary
           </NavLink>

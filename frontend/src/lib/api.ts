@@ -481,10 +481,29 @@ export const loginUser = async (username: string, password: string) => {
   }
 };
 
-export const getJobs = async () => {
-  return fetchWithOfflineCache(buildUserScopedCacheKey("jobs"), `${API_URL}/jobs`, {
-    headers: getAuthHeaders(),
-  });
+export type Job = {
+  id: string;
+  busId: string;
+  busName: string;
+  componentId: string;
+  componentName: string;
+  title: string;
+  status: string;
+  urgency: string;
+  assignedTo: string;
+  assignedToName: string | null;
+  dueDate: string;
+  createdAt: string;
+};
+
+export const getJobs = async (): Promise<Job[]> => {
+  return fetchWithOfflineCache(
+    buildUserScopedCacheKey("jobs"),
+    `${API_URL}/jobs`,
+    {
+      headers: getAuthHeaders(),
+    }
+  );
 };
 
 export const getCachedJobsSnapshot = async () => {
