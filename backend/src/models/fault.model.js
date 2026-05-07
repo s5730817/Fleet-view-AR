@@ -105,6 +105,27 @@ exports.getFaultById = async (id) => {
   return result.rows[0] || null;
 };
 
+exports.getIssueTypeById = async (id) => {
+  if (!id) {
+    return null;
+  }
+
+  const result = await db.query(
+    `SELECT
+      id,
+      part_code,
+      code,
+      label,
+      default_priority,
+      recommended_action
+     FROM issue_types
+     WHERE id = $1`,
+    [id]
+  );
+
+  return result.rows[0] || null;
+};
+
 // Create a new fault
 exports.createFault = async ({ id, bus_part_id, issue_type_id, created_by, title, description, status, priority, source }, executor = db) => {
   await executor.query(
@@ -140,12 +161,18 @@ exports.createIssueAssignment = async ({ id, issue_id, user_id, assigned_at }, e
 };
 
 // Update a fault's status
-exports.updateFaultStatus = async (id, status) => {
-  await db.query(
+exports.updateFaultStatus = async (id, status, executor = db, options = {}) => {
+  const approvedBy = options.approvedBy || null;
+
+  await executor.query(
     `UPDATE issues
-     SET status = $1, updated_at = NOW()
+     SET status = $1,
+         approved_by = CASE WHEN $1 = 'resolved' AND $3::uuid IS NOT NULL THEN $3::uuid ELSE approved_by END,
+         approved_at = CASE WHEN $1 = 'resolved' AND $3::uuid IS NOT NULL THEN NOW() ELSE approved_at END,
+         updated_at = NOW(),
+         resolved_at = CASE WHEN $1 = 'resolved' THEN NOW() ELSE NULL END
      WHERE id = $2`,
-    [status, id]
+    [status, id, approvedBy]
   );
 };
 
@@ -158,9 +185,10 @@ exports.createFaultUpdate = async ({
   description,
   status_from,
   status_to,
-  new_issue_id
-}) => {
-  await db.query(
+  new_issue_id,
+  metadata = null,
+}, executor = db) => {
+  await executor.query(
     `INSERT INTO issue_updates (
       id,
       issue_id,
@@ -170,9 +198,10 @@ exports.createFaultUpdate = async ({
       description,
       status_from,
       status_to,
-      new_issue_id
+      new_issue_id,
+      metadata
     )
-    VALUES ($1, $2, NOW(), $3, $4, $5, $6, $7, $8)`,
+    VALUES ($1, $2, NOW(), $3, $4, $5, $6, $7, $8, $9)`,
     [
       id,
       issue_id,
@@ -181,9 +210,34 @@ exports.createFaultUpdate = async ({
       description,
       status_from,
       status_to,
-      new_issue_id
+      new_issue_id,
+      metadata
     ]
   );
+};
+
+exports.getLatestMaintenanceApprovalRequest = async (issueId) => {
+  const result = await db.query(
+    `SELECT
+      id,
+      issue_id,
+      created_at,
+      created_by,
+      update_type,
+      description,
+      status_from,
+      status_to,
+      new_issue_id,
+      metadata
+     FROM issue_updates
+     WHERE issue_id = $1
+       AND metadata ->> 'kind' = 'maintenance_approval_request'
+     ORDER BY created_at DESC, id DESC
+     LIMIT 1`,
+    [issueId]
+  );
+
+  return result.rows[0] || null;
 };
 
 // Get all updates for one fault

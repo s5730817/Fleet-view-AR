@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { getJobs } from "@/lib/api";
+import { getCachedFleetSnapshot, getCachedJobsSnapshot, getJobs } from "@/lib/api";
+import type { Bus } from "@/types/fleet";
+import { getDaysUntil, isPastDate } from "@/lib/dateUtils";
 import { ChevronDown } from "lucide-react";
+import { toast } from "sonner";
 
 import {
   DropdownMenu,
@@ -34,6 +37,21 @@ const getUrgencyBadgeClass = (urgency: string) => {
 
 export default function MyJobs() {
   const navigate = useNavigate();
+  const [cachedJobs, setCachedJobs] = useState<Array<{
+    id: string;
+    busId: string;
+    busName: string;
+    componentId: string;
+    componentName: string;
+    title: string;
+    status: string;
+    urgency: string;
+    assignedTo: string;
+    assignedToName: string | null;
+    dueDate: string;
+    createdAt: string;
+  }>>([]);
+  const [cachedFleet, setCachedFleet] = useState<Bus[]>([]);
 
   const [jobView, setJobView] = useState<
     "all" | "urgency" | "dueSoonest" | "newest"
@@ -44,6 +62,18 @@ export default function MyJobs() {
     queryFn: getJobs,
   });
 
+  useEffect(() => {
+    void getCachedJobsSnapshot().then((snapshot) => {
+      setCachedJobs(snapshot);
+    });
+
+    void getCachedFleetSnapshot().then((snapshot) => {
+      setCachedFleet(snapshot);
+    });
+  }, []);
+
+  const visibleJobs = jobs.length > 0 ? jobs : cachedJobs;
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -52,7 +82,7 @@ export default function MyJobs() {
     );
   }
 
-  if (error) {
+  if (error && visibleJobs.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <p className="text-lg font-bold text-red-500">Error loading jobs</p>
@@ -60,7 +90,7 @@ export default function MyJobs() {
     );
   }
 
-  const sortedJobs = [...jobs].sort((a, b) => {
+  const sortedJobs = [...visibleJobs].sort((a, b) => {
     if (jobView === "urgency") {
       return urgencyRank[b.urgency] - urgencyRank[a.urgency];
     }
@@ -146,7 +176,8 @@ export default function MyJobs() {
         <div className="space-y-3">
           {sortedJobs.length > 0 ? (
             sortedJobs.map((job) => {
-              const isOverdue = new Date(job.dueDate) < new Date();
+              const isOverdue = isPastDate(job.dueDate);
+              const daysUntilDue = getDaysUntil(job.dueDate);
 
               return (
                 <div
@@ -181,24 +212,40 @@ export default function MyJobs() {
                     <p className="text-sm text-muted-foreground">
                       Assigned to:{" "}
                       <span className="font-medium text-foreground">
-                        {job.assignedToName || "You"}
+                        {job.assignedToName || "Unassigned"}
                       </span>
+                    </p>
+
+                    <p className="text-sm text-muted-foreground">
+                      Status: {" "}
+                      <span className="font-medium text-foreground">{job.status}</span>
                     </p>
 
                     <p className="text-sm text-muted-foreground">
                       Due:{" "}
                       <span className="font-medium text-foreground">
-                        {new Date(job.dueDate).toLocaleDateString()}
+                        {daysUntilDue < 0
+                          ? `${new Date(job.dueDate).toLocaleDateString()} (${Math.abs(daysUntilDue)}d overdue)`
+                          : daysUntilDue === 0
+                          ? `${new Date(job.dueDate).toLocaleDateString()} (due today)`
+                          : `${new Date(job.dueDate).toLocaleDateString()} (in ${daysUntilDue}d)`}
                       </span>
                     </p>
                   </div>
 
                   <button
-                    onClick={() =>
+                    onClick={() => {
+                      const cachedBus = cachedFleet.find((bus) => bus.id === job.busId) || null;
+
+                      if (!cachedBus && !window.navigator.onLine) {
+                        toast.error("Bus details are not available offline for this job yet");
+                        return;
+                      }
+
                       navigate(`/bus/${job.busId}`, {
-                        state: { from: "/jobs" },
-                      })
-                    }
+                        state: { from: "/jobs", bus: cachedBus || undefined },
+                      });
+                    }}
                     className="shrink-0 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground"
                   >
                     View

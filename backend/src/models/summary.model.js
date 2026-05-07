@@ -7,7 +7,7 @@ exports.getSummaryStats = async () => {
       COUNT(*) FILTER (WHERE status = 'resolved')::int AS completed,
       COUNT(*) FILTER (
         WHERE due_at IS NOT NULL
-          AND due_at < NOW()
+          AND due_at::date < CURRENT_DATE
           AND status <> 'resolved'
       )::int AS overdue
      FROM issues`

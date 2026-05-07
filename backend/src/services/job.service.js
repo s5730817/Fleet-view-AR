@@ -1,5 +1,9 @@
 // This file contains temporary mock job logic until the database is ready.
 
+const {
+  shiftDemoDate
+} = require("../utils/demoTimeline");
+
 // Temporary mock jobs
 const mockJobs = [
   {
@@ -118,9 +122,13 @@ const mockJobs = [
 
 // GET jobs based on logged-in user's role
 exports.getJobsForUser = async (user) => {
-  if (user.role === "admin" || user.role === "manager") {
-    return mockJobs;
-  }
+  const visibleJobs = (user.role === "admin" || user.role === "manager")
+    ? mockJobs
+    : mockJobs.filter((job) => job.assignedTo === user.id);
 
-  return mockJobs.filter((job) => job.assignedTo === user.id);
+  return visibleJobs.map((job) => ({
+    ...job,
+    dueDate: shiftDemoDate(job.dueDate),
+    createdAt: shiftDemoDate(job.createdAt)
+  }));
 };

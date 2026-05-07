@@ -1,7 +1,8 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { BusCard } from "@/components/BusCard";
-import { useQuery } from "@tanstack/react-query";
-import { getFleet } from "@/lib/api";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getBusById, getFleet } from "@/lib/api";
 import { Bus, Wrench, AlertTriangle, CheckCircle2, ChevronDown } from "lucide-react";
 
 import {
@@ -11,15 +12,29 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 
-const DEPOT_COUNT = 6;
-
 const Index = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data: fleet = [], isLoading, error } = useQuery({
     queryKey: ["fleet"],
     queryFn: getFleet,
   });
+
+  useEffect(() => {
+    if (!window.navigator.onLine || fleet.length === 0) {
+      return;
+    }
+
+    void (async () => {
+      for (const bus of fleet) {
+        await queryClient.prefetchQuery({
+          queryKey: ["bus", bus.id],
+          queryFn: () => getBusById(bus.id),
+        }).catch(() => null);
+      }
+    })();
+  }, [fleet, queryClient]);
 
   if (isLoading) {
     return (
@@ -37,20 +52,43 @@ const Index = () => {
     );
   }
 
-  const operational = fleet.filter(b => b.status === "Operational").length;
-  const needsService = fleet.filter(b => b.status === "Needs Service").length;
-  const underRepair = fleet.filter(b => b.status === "Under Repair").length;
+  const good = fleet.filter(b => b.status === "Good").length;
+  const requiresAttention = fleet.filter(b => b.status === "Requires Attention").length;
+  const outOfOperation = fleet.filter(b => b.status === "Out Of Operation").length;
+  const openReports = fleet.filter(b => b.issueIndicator.activeCount > 0).length;
 
-  const depots = Array.from({ length: DEPOT_COUNT }, (_, index) => ({
-    depotNumber: index + 1,
-    buses: fleet.filter((_, busIndex) => busIndex % DEPOT_COUNT === index),
-  }));
+  const depots = Array.from(
+    fleet.reduce((groups, bus) => {
+      const depotId = bus.depotId || "unassigned";
+      const existing = groups.get(depotId);
+
+      if (existing) {
+        existing.buses.push(bus);
+        return groups;
+      }
+
+      groups.set(depotId, {
+        depotId,
+        depotName: bus.depotName || "Unassigned Depot",
+        buses: [bus],
+      });
+
+      return groups;
+    }, new Map<string, { depotId: string; depotName: string; buses: typeof fleet }>()).values(),
+  ).sort((left, right) => left.depotName.localeCompare(right.depotName));
+
+  const overviewSubtitle = depots.length > 1
+    ? "Fleet overview across your visible depots."
+    : depots.length === 1
+    ? `Fleet overview for ${depots[0].depotName}.`
+    : "No buses are available for your current scope.";
 
   const stats = [
     { label: "Total Fleet", value: fleet.length, icon: Bus, color: "text-primary bg-primary/10" },
-    { label: "Operational", value: operational, icon: CheckCircle2, color: "text-status-operational bg-status-operational/10" },
-    { label: "Needs Service", value: needsService, icon: AlertTriangle, color: "text-status-service bg-status-service/10" },
-    { label: "Under Repair", value: underRepair, icon: Wrench, color: "text-status-repair bg-status-repair/10" },
+    { label: "Good", value: good, icon: CheckCircle2, color: "text-status-operational bg-status-operational/10" },
+    { label: "Requires Attention", value: requiresAttention, icon: AlertTriangle, color: "text-status-service bg-status-service/10" },
+    { label: "Out Of Operation", value: outOfOperation, icon: Wrench, color: "text-status-urgent bg-status-urgent/10" },
+    { label: "With Reports", value: openReports, icon: AlertTriangle, color: "text-primary bg-primary/10" },
   ];
 
   return (
@@ -65,7 +103,7 @@ const Index = () => {
               Overview
             </h1>
             <p className="text-sm text-muted-foreground">
-              Fleet-wide overview across all depots.
+              {overviewSubtitle}
             </p>
           </div>
 
@@ -90,7 +128,7 @@ const Index = () => {
         </div>
 
         {/* STATS */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
           {stats.map(stat => (
             <div key={stat.label} className="rounded-lg border bg-card p-4 flex items-center gap-3">
               <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${stat.color}`}>
@@ -111,11 +149,11 @@ const Index = () => {
           </h2>
 
           {depots.map(depot => (
-            <section key={depot.depotNumber} className="space-y-3">
+            <section key={depot.depotId} className="space-y-3">
               <div className="flex items-center justify-between rounded-lg border bg-card px-4 py-3">
                 <div>
                   <h3 className="text-lg font-bold text-foreground">
-                    Depot {depot.depotNumber}
+                    {depot.depotName}
                   </h3>
                   <p className="text-sm text-muted-foreground">
                     {depot.buses.length} {depot.buses.length === 1 ? "bus" : "buses"}

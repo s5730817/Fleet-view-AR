@@ -2,12 +2,64 @@
 
 const { randomUUID } = require("crypto");
 const db = require("../database/db");
+const authModel = require("../models/auth.model");
 const faultModel = require("../models/fault.model");
+const fleetModel = require("../models/fleet.model");
 const {
   allowedStatuses,
   allowedPriorities,
   allowedSorts
 } = require("../utils/fault.validators");
+
+const resolveUserScope = async (user) => {
+  const fallbackRole = typeof user?.role === "string" ? user.role.trim().toLowerCase() : null;
+
+  if (!user?.id) {
+    return {
+      role: fallbackRole,
+      depotId: null,
+      restrictToDepot: fallbackRole !== "admin",
+      actorId: null,
+      currentUser: null,
+    };
+  }
+
+  const persistedUser = await authModel.getUserById(user.id);
+  const role = typeof persistedUser?.role === "string"
+    ? persistedUser.role.trim().toLowerCase()
+    : fallbackRole;
+
+  return {
+    role,
+    depotId: persistedUser?.depot_id || null,
+    restrictToDepot: role !== "admin",
+    actorId: persistedUser?.id || user.id,
+    currentUser: persistedUser || null,
+  };
+};
+
+const canAccessPartContext = (scope, partContext) => {
+  if (!partContext) {
+    return false;
+  }
+
+  if (!scope.restrictToDepot) {
+    return true;
+  }
+
+  return Boolean(scope.depotId) && scope.depotId === partContext.depot_id;
+};
+
+const buildIssueAssigneeUsers = (users) => users.filter((user) => user.role === "engineer");
+
+const getMaintenanceApprovalPayload = (update) => {
+  const metadata = update?.metadata;
+  if (!metadata || metadata.kind !== "maintenance_approval_request") {
+    return null;
+  }
+
+  return metadata.maintenance || null;
+};
 
 // Get dashboard summary for faults
 exports.getFaultSummary = async () => {
@@ -48,9 +100,26 @@ exports.createFault = async ({
   source,
   created_by,
   assigned_user_id
-}) => {
+}, actor) => {
   if (!title) {
     throw new Error("Title is required");
+  }
+
+  const scope = await resolveUserScope(actor);
+  if (!scope.actorId || !scope.role) {
+    throw new Error("Not authorised");
+  }
+
+  let partContext = null;
+  if (bus_part_id) {
+    partContext = await fleetModel.getPartContextById(bus_part_id);
+    if (!partContext) {
+      throw new Error("Bus part not found");
+    }
+
+    if (!canAccessPartContext(scope, partContext)) {
+      throw new Error("Forbidden");
+    }
   }
 
   const finalStatus = status || "reported";
@@ -66,13 +135,32 @@ exports.createFault = async ({
 
   const faultId = randomUUID();
   const assignedAt = new Date().toISOString();
+  let finalAssignedUserId = null;
+
+  if (scope.role === "engineer") {
+    finalAssignedUserId = scope.actorId;
+  } else if (partContext) {
+    const issueAssigneeUsers = buildIssueAssigneeUsers(
+      await fleetModel.getAssignableUsersForDepot(partContext.depot_id)
+    );
+
+    if (!assigned_user_id) {
+      throw new Error("Assignee is required");
+    }
+
+    if (!issueAssigneeUsers.some((user) => user.id === assigned_user_id)) {
+      throw new Error("Selected assignee is not valid for this bus");
+    }
+
+    finalAssignedUserId = assigned_user_id;
+  }
 
   await db.withTransaction(async (client) => {
     await faultModel.createFault({
       id: faultId,
       bus_part_id: bus_part_id || null,
       issue_type_id: issue_type_id || null,
-      created_by: created_by || null,
+      created_by: scope.actorId,
       title,
       description: description || null,
       status: finalStatus,
@@ -80,11 +168,15 @@ exports.createFault = async ({
       source: source || null
     }, client);
 
-    if (assigned_user_id) {
+    if (bus_part_id) {
+      await fleetModel.reconcilePartConditionFromActiveIssues(bus_part_id, client);
+    }
+
+    if (finalAssignedUserId) {
       await faultModel.createIssueAssignment({
         id: randomUUID(),
         issue_id: faultId,
-        user_id: assigned_user_id,
+        user_id: finalAssignedUserId,
         assigned_at: assignedAt
       }, client);
     }
@@ -94,7 +186,7 @@ exports.createFault = async ({
 };
 
 // Update a fault's status and create a history record
-exports.updateFaultStatus = async (id, { status, created_by }) => {
+exports.updateFaultStatus = async (id, { status }, actor) => {
   if (!status) {
     throw new Error("Status is required");
   }
@@ -104,24 +196,99 @@ exports.updateFaultStatus = async (id, { status, created_by }) => {
   }
 
   const existingFault = await faultModel.getFaultById(id);
+  const scope = await resolveUserScope(actor);
+
+  if (!scope.actorId || !scope.role) {
+    throw new Error("Not authorised");
+  }
 
   if (!existingFault) {
     return null;
   }
 
+  if (existingFault.bus_part_id) {
+    const partContext = await fleetModel.getPartContextById(existingFault.bus_part_id);
+    if (!canAccessPartContext(scope, partContext)) {
+      throw new Error("Forbidden");
+    }
+  }
+
   const oldStatus = existingFault.status;
 
-  await faultModel.updateFaultStatus(id, status);
+  const pendingMaintenanceApproval = oldStatus === "awaiting_approval"
+    ? getMaintenanceApprovalPayload(await faultModel.getLatestMaintenanceApprovalRequest(id))
+    : null;
 
-  await faultModel.createFaultUpdate({
-    id: randomUUID(),
-    issue_id: id,
-    created_by: created_by || null,
-    update_type: "status_change",
-    description: `Status changed from ${oldStatus} to ${status}`,
-    status_from: oldStatus,
-    status_to: status,
-    new_issue_id: null
+  if (pendingMaintenanceApproval && status === "resolved" && scope.role === "engineer") {
+    throw new Error("A manager or admin must approve this maintenance log");
+  }
+
+  if (pendingMaintenanceApproval && status === "resolved") {
+    const maintenance = pendingMaintenanceApproval;
+    const maintenanceIssueIds = Array.isArray(maintenance.resolvedIssueIds)
+      ? [...new Set(maintenance.resolvedIssueIds.filter((issueId) => typeof issueId === "string" && issueId.trim().length > 0))]
+      : [];
+
+    await db.withTransaction(async (client) => {
+      await fleetModel.createMaintenanceEntry({
+        id: require("crypto").randomUUID(),
+        bus_part_id: existingFault.bus_part_id,
+        user_id: maintenance.technicianUserId || null,
+        technician_name: maintenance.technicianName || "Technician",
+        entry_type: maintenance.entryType,
+        description: maintenance.description,
+        notes: maintenance.notes || null,
+      }, client);
+
+      await fleetModel.updatePartLifecycleAfterMaintenance(existingFault.bus_part_id, maintenance.entryType, client);
+
+      if (maintenanceIssueIds.length > 0) {
+        await fleetModel.resolveActiveIssuesForPart({
+          partId: existingFault.bus_part_id,
+          createdBy: scope.actorId,
+          approvedBy: scope.actorId,
+          note: `Manager approved ${maintenance.entryType} logged by ${maintenance.technicianName || "technician"}`,
+          issueIds: maintenanceIssueIds,
+        }, client);
+      } else {
+        await faultModel.updateFaultStatus(id, status, client, { approvedBy: scope.actorId });
+        await faultModel.createFaultUpdate({
+          id: randomUUID(),
+          issue_id: id,
+          created_by: scope.actorId,
+          update_type: "status_change",
+          description: `Manager approved ${maintenance.entryType} logged by ${maintenance.technicianName || "technician"}`,
+          status_from: oldStatus,
+          status_to: status,
+          new_issue_id: null,
+        }, client);
+      }
+
+      await fleetModel.reconcilePartConditionFromActiveIssues(existingFault.bus_part_id, client);
+    });
+
+    return await faultModel.getFaultById(id);
+  }
+
+  await db.withTransaction(async (client) => {
+    await faultModel.updateFaultStatus(id, status, client, {
+      approvedBy: status === "resolved" && scope.role !== "engineer" ? scope.actorId : null,
+    });
+
+    await faultModel.createFaultUpdate({
+      id: randomUUID(),
+      issue_id: id,
+      created_by: scope.actorId,
+      update_type: "status_change",
+      description: `Status changed from ${oldStatus} to ${status}`,
+      status_from: oldStatus,
+      status_to: status,
+      new_issue_id: null
+    }, client);
+
+    if (existingFault.bus_part_id) {
+      await fleetModel.reconcilePartConditionFromActiveIssues(existingFault.bus_part_id, client);
+    }
   });
 
   return await faultModel.getFaultById(id);
@@ -139,9 +306,8 @@ exports.getFaultUpdates = async (id) => {
 };
 
 // Add a new update for one fault
-exports.addFaultUpdate = async (id, body) => {
+exports.addFaultUpdate = async (id, body, actor) => {
   const {
-    created_by,
     update_type,
     description,
     status_from,
@@ -158,9 +324,21 @@ exports.addFaultUpdate = async (id, body) => {
   }
 
   const fault = await faultModel.getFaultById(id);
+  const scope = await resolveUserScope(actor);
+
+  if (!scope.actorId || !scope.role) {
+    throw new Error("Not authorised");
+  }
 
   if (!fault) {
     return null;
+  }
+
+  if (fault.bus_part_id) {
+    const partContext = await fleetModel.getPartContextById(fault.bus_part_id);
+    if (!canAccessPartContext(scope, partContext)) {
+      throw new Error("Forbidden");
+    }
   }
 
   const updateId = randomUUID();
@@ -168,7 +346,7 @@ exports.addFaultUpdate = async (id, body) => {
   await faultModel.createFaultUpdate({
     id: updateId,
     issue_id: id,
-    created_by: created_by || null,
+    created_by: scope.actorId,
     update_type,
     description,
     status_from: status_from || null,

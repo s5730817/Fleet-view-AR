@@ -2,19 +2,19 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { BusStatusBadge } from "@/components/StatusBadge";
 import { Bus as BusIcon, Gauge, Calendar, Wrench, ChevronRight } from "lucide-react";
+import { useSyncStatus } from "@/context/SyncStatusContext";
 import type { Bus } from "@/types/fleet";
-import { getDaysAgo, getDaysUntil } from "@/lib/dateUtils";
+import { getDaysAgo } from "@/lib/dateUtils";
 
 export function BusCard({ bus }: { bus: Bus }) {
   const navigate = useNavigate();
-  const daysUntilService = getDaysUntil(bus.nextServiceDate);
-  const urgentComponents = bus.components.filter(c => c.status === "Urgent").length;
-  const dueSoonComponents = bus.components.filter(c => c.status === "Due Soon").length;
+  const { getBusOperationState } = useSyncStatus();
+  const busQueueState = getBusOperationState(bus.id);
 
   return (
     <Card
       className="group cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-primary/30 hover:-translate-y-0.5"
-      onClick={() => navigate(`/bus/${bus.id}`)}
+      onClick={() => navigate(`/bus/${bus.id}`, { state: { from: "/dashboard", bus } })}
     >
       <CardContent className="p-5">
         <div className="flex items-start justify-between mb-4">
@@ -30,10 +30,6 @@ export function BusCard({ bus }: { bus: Bus }) {
           <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
         </div>
 
-        <div className="mb-4">
-          <BusStatusBadge status={bus.status} />
-        </div>
-
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Gauge className="h-3.5 w-3.5" />
@@ -43,27 +39,49 @@ export function BusCard({ bus }: { bus: Bus }) {
             <Calendar className="h-3.5 w-3.5" />
             <span className="text-xs">Last: {getDaysAgo(bus.lastServiceDate)}d ago</span>
           </div>
-          <div className="col-span-2 flex items-center gap-2">
-            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className={`text-xs font-medium ${daysUntilService <= 7 ? "text-status-urgent" : daysUntilService <= 30 ? "text-status-service" : "text-muted-foreground"}`}>
-              Next service: {daysUntilService <= 0 ? "Overdue!" : `in ${daysUntilService} days`}
-            </span>
+          <div className="col-span-2 flex items-center justify-between pt-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Status</span>
+            <BusStatusBadge status={bus.status} />
           </div>
         </div>
 
-        {(urgentComponents > 0 || dueSoonComponents > 0) && (
-          <div className="mt-3 pt-3 border-t flex items-center gap-2">
-            <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
-            <div className="flex gap-2 text-xs">
-              {urgentComponents > 0 && (
-                <span className="text-status-urgent font-medium">{urgentComponents} urgent</span>
+        <div className="mt-3 rounded-lg border bg-background/60 p-3 space-y-1.5 text-xs text-muted-foreground">
+          {(busQueueState.pending > 0 || busQueueState.review > 0) && (
+            <div className="flex flex-wrap items-center gap-2 pb-1">
+              {busQueueState.pending > 0 && (
+                <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 font-semibold text-primary">
+                  {busQueueState.pending} pending sync
+                </span>
               )}
-              {dueSoonComponents > 0 && (
-                <span className="text-status-service font-medium">{dueSoonComponents} due soon</span>
+              {busQueueState.review > 0 && (
+                <span className="rounded-full border border-status-urgent/30 bg-status-urgent/10 px-2.5 py-1 font-semibold text-status-urgent">
+                  {busQueueState.review} need sync attention
+                </span>
               )}
             </div>
-          </div>
-        )}
+          )}
+          <p>
+            Routine maintenance: <span className="font-medium text-foreground">{bus.serviceIndicator.label}</span>
+          </p>
+          <p>
+            Due date: <span className="font-medium text-foreground">{bus.serviceIndicator.dueDate || "Not scheduled"}</span>
+          </p>
+          {bus.issueIndicator.activeCount > 0 && (
+            <p>
+              Open reports: <span className="font-medium text-foreground">{bus.issueIndicator.activeCount}</span>
+            </p>
+          )}
+          {(bus.componentIndicator.outOfOperationCount > 0 || bus.componentIndicator.requiresAttentionCount > 0) && (
+            <div className="flex items-center gap-2 pt-1">
+              <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="font-medium text-foreground">
+                {bus.componentIndicator.outOfOperationCount > 0
+                  ? `${bus.componentIndicator.outOfOperationCount} critical component${bus.componentIndicator.outOfOperationCount === 1 ? "" : "s"}`
+                  : `${bus.componentIndicator.requiresAttentionCount} component${bus.componentIndicator.requiresAttentionCount === 1 ? "" : "s"} need attention`}
+              </span>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

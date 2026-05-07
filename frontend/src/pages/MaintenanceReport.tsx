@@ -27,7 +27,7 @@ type ReportTarget = {
 
 const getStatusStyle = (status: Bus["status"]) => {
   switch (status) {
-    case "Operational":
+    case "Good":
       return {
         icon: <CheckCircle2 className="h-4 w-4" />,
         label: "Completed",
@@ -46,6 +46,15 @@ const getStatusStyle = (status: Bus["status"]) => {
         icon: <AlertTriangle className="h-4 w-4" />,
         label: "Fault Found",
         className: "bg-red-500/10 text-red-500 border-red-500/20",
+      };
+
+    default:
+      console.warn("Unknown bus status:", status);
+
+      return {
+        icon: <AlertTriangle className="h-4 w-4" />,
+        label: "Unknown",
+        className: "bg-gray-500/10 text-gray-500 border-gray-500/20",
       };
   }
 };

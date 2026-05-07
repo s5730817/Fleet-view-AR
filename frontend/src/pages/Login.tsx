@@ -1,10 +1,14 @@
 import { useState, FormEvent } from "react";
+import { useEffect } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { loginUser, verify2FA } from "@/lib/api";
+import { loginUser, primeOfflineSessionCaches, verify2FA } from "@/lib/api";
+import { hasValidOfflineSession, persistOfflineSession } from "@/lib/offline";
+
+const USER_CHANGED_EVENT = "transitlens:user-changed";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -17,6 +21,12 @@ const Login = () => {
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!window.navigator.onLine && hasValidOfflineSession()) {
+      navigate("/dashboard");
+    }
+  }, [navigate]);
 
   // ── STEP 1: LOGIN (EMAIL + PASSWORD) ──────────────────────
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
@@ -41,12 +51,21 @@ const Login = () => {
       // Fallback (shouldn't happen with 2FA enabled)
       localStorage.setItem("token", result.token);
       localStorage.setItem("user", JSON.stringify(result.user));
+      persistOfflineSession(result.user);
+      await primeOfflineSessionCaches().catch(() => null);
+      window.dispatchEvent(new Event(USER_CHANGED_EVENT));
 
       navigate("/dashboard");
     } catch (err) {
       console.error("Login failed:", err);
-      setError("Invalid email or password");
-    } finally {
+
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Invalid email or password";
+
+      setError(message);
+    }finally {
       setLoading(false);
     }
   };
@@ -65,6 +84,9 @@ const Login = () => {
 
       localStorage.setItem("token", result.token);
       localStorage.setItem("user", JSON.stringify(result.user));
+      persistOfflineSession(result.user);
+      await primeOfflineSessionCaches().catch(() => null);
+      window.dispatchEvent(new Event(USER_CHANGED_EVENT));
 
       navigate("/dashboard");
     } catch (err) {
@@ -113,7 +135,9 @@ const Login = () => {
           <p className="text-sm text-muted-foreground">
             {requires2FA
               ? "Enter the 6-digit verification code sent to your email."
-              : "Access your TransitLens dashboard"}
+              : !window.navigator.onLine
+                ? "Offline sign-in is only available for a recently authenticated depot session."
+                : "Access your TransitLens dashboard"}
           </p>
         </div>
 

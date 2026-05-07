@@ -4,8 +4,10 @@
  * Placeholder permission system for AR view (and future features).
  *
  * Roles:
- *   "user"    – standard authenticated user
- *   "manager" – elevated role with additional actions
+ *   "engineer"  – standard technician workflow
+ *   "manager"   – elevated role with write access
+ *   "admin"     – full access
+ *   "user"      – legacy fallback for older mock sessions
  *
  * Permissions:
  *   "inspect" – available to all roles
@@ -19,13 +21,13 @@ import { createContext, useContext } from "react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type UserRole = "user" | "manager" | "admin";
+export type UserRole = "engineer" | "manager" | "admin" | "user";
 
 export type Permission = "inspect" | "create";
 
 // Map each permission to the minimum role required to use it.
 const ROLE_PERMISSIONS: Record<Permission, UserRole[]> = {
-  inspect: ["user", "manager", "admin"],
+  inspect: ["engineer", "manager", "admin", "user"],
   create:  ["manager", "admin"],
 };
 
@@ -44,7 +46,7 @@ interface PermissionContextType {
 }
 
 const PermissionContext = createContext<PermissionContextType>({
-  role: "user",
+  role: "engineer",
   hasPermission: () => false,
 });
 

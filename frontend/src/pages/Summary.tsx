@@ -94,7 +94,7 @@ const Summary = () => {
         />
 
         <StatCard
-          title="Overdue"
+          title="Jobs Overdue"
           value={summaryStats.overdue}
           description="Jobs past due date"
           icon={<AlertTriangle className="h-5 w-5" />}
@@ -115,7 +115,7 @@ const Summary = () => {
 
       {/* Charts Row 2 */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <DashboardCard title="On Time vs Overdue">
+        <DashboardCard title="On Time vs Jobs Overdue">
           <OnTimeOverdueChart data={onTimeOverdueData} />
         </DashboardCard>
 
