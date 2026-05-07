@@ -7,27 +7,27 @@ import {
   Legend,
 } from "recharts";
 
-export type PriorityData = {
+export type FleetConditionData = {
   name: string;
   value: number;
 };
 
 interface Props {
-  data: PriorityData[];
+  data: FleetConditionData[];
 }
 
-const priorityColors: Record<string, string> = {
-  High: "#ef4444",
-  Medium: "#eab308",
-  Low: "#22c55e",
-  None: "hsl(var(--primary))",
+const fleetColors: Record<string, string> = {
+  Good: "#22c55e",
+  "Requires Attention": "#eab308",
+  "Out Of Operation": "#ef4444",
 };
 
-export const PriorityPieChart = ({ data }: Props) => {
+export const FleetConditionChart = ({ data }: Props) => {
   return (
     <div className="h-[280px] w-full">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
+
           <Pie
             data={data}
             dataKey="value"
@@ -35,17 +35,21 @@ export const PriorityPieChart = ({ data }: Props) => {
             innerRadius={55}
             outerRadius={90}
             paddingAngle={3}
-            label
           >
             {data.map((item) => (
               <Cell
                 key={item.name}
-                fill={priorityColors[item.name] || "hsl(var(--muted-foreground))"}
+                fill={
+                  fleetColors[item.name] ||
+                  "hsl(var(--muted-foreground))"
+                }
               />
             ))}
           </Pie>
+
           <Tooltip />
           <Legend />
+
         </PieChart>
       </ResponsiveContainer>
     </div>

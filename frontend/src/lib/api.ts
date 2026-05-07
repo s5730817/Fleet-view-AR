@@ -491,10 +491,29 @@ export const loginUser = async (username: string, password: string) => {
   }
 };
 
-export const getJobs = async () => {
-  return fetchWithOfflineCache(buildUserScopedCacheKey("jobs"), `${API_URL}/jobs`, {
-    headers: getAuthHeaders(),
-  });
+export type Job = {
+  id: string;
+  busId: string;
+  busName: string;
+  componentId: string;
+  componentName: string;
+  title: string;
+  status: string;
+  urgency: string;
+  assignedTo: string;
+  assignedToName: string | null;
+  dueDate: string;
+  createdAt: string;
+};
+
+export const getJobs = async (): Promise<Job[]> => {
+  return fetchWithOfflineCache(
+    buildUserScopedCacheKey("jobs"),
+    `${API_URL}/jobs`,
+    {
+      headers: getAuthHeaders(),
+    }
+  );
 };
 
 export const getCachedJobsSnapshot = async () => {
@@ -518,10 +537,55 @@ export const getCachedFleetSnapshot = async () => {
   return (await getCachedValue<Bus[]>(buildUserScopedCacheKey("fleet"))) || [];
 };
 
-export const getSummary = async () => {
-  return fetchWithOfflineCache(buildUserScopedCacheKey("summary"), `${API_URL}/summary`, {
+export type SummaryPeriod = "week" | "month" | "3months" | "6months" | "year";
+
+export type SummaryData = {
+  period: SummaryPeriod;
+  periodLabel: string;
+
+  summaryStats: {
+    created: number;
+    completed: number;
+    completionRate: string;
+    overdue: number;
+  };
+
+  createdCompletedData: {
+    date: string;
+    created: number;
+    completed: number;
+  }[];
+
+  fleetConditionData: {
+    name: string;
+    value: number;
+  }[];
+
+  onTimeOverdueData: {
+    name: string;
+    value: number;
+  }[];
+
+  jobsByStatusData: {
+    status: string;
+    value: number;
+  }[];
+};
+
+export const getSummary = async (
+  period: SummaryPeriod = "week"
+): Promise<SummaryData> => {
+  const res = await fetch(`${API_URL}/summary?period=${period}`, {
     headers: getAuthHeaders(),
   });
+
+  const json = await res.json();
+
+  if (!json.success) {
+    throw new Error(json.error || "Failed to fetch summary");
+  }
+
+  return json.data;
 };
 
 // Verify 2FA code
@@ -820,4 +884,30 @@ export const syncPendingOperations = async () => {
 
   dispatchOfflineSyncEvent({ synced, failed });
   return { synced, failed };
+};
+
+export type TeamRole = "Admin" | "Manager" | "Technician";
+export type TeamStatus = "Active" | "On Job" | "Offline";
+
+export type TeamMember = {
+  id: string;
+  name: string;
+  role: TeamRole;
+  email: string;
+  phone: string;
+  status: TeamStatus;
+};
+
+export const getTeamMembers = async (): Promise<TeamMember[]> => {
+  const res = await fetch(`${API_URL}/team`, {
+    headers: getAuthHeaders(),
+  });
+
+  const json = await res.json();
+
+  if (!json.success) {
+    throw new Error(json.error || "Failed to fetch team members");
+  }
+
+  return json.data;
 };

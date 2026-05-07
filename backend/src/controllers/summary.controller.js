@@ -5,7 +5,8 @@ const { summaryService } = require("../services");
 // GET summary dashboard data
 exports.getSummary = async (req, res) => {
   try {
-    const summary = await summaryService.getSummaryData();
+    const period = req.query.period || "week";
+    const summary = await summaryService.getSummaryData(period);
 
     res.status(200).json({
       success: true,

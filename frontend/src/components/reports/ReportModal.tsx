@@ -23,6 +23,7 @@ export function ReportModal({ title, buses, onClose }: ReportModalProps) {
         <div className="mb-5 flex items-start justify-between gap-4 border-b pb-4">
           <div>
             <h2 className="text-xl font-bold text-foreground">{title}</h2>
+
             <p className="text-sm text-muted-foreground">
               {buses.length} {buses.length === 1 ? "bus" : "buses"} included
             </p>
@@ -35,11 +36,15 @@ export function ReportModal({ title, buses, onClose }: ReportModalProps) {
 
         <div className="space-y-6">
           {buses.map((bus) => (
-            <section key={bus.id} className="rounded-xl border bg-background p-4">
+            <section
+              key={bus.id}
+              className="rounded-xl border bg-background p-4"
+            >
               <div className="mb-4">
                 <h3 className="text-lg font-bold text-foreground">
                   {bus.name}
                 </h3>
+
                 <p className="text-sm text-muted-foreground">
                   {bus.plateNumber} · {bus.year} {bus.model}
                 </p>
@@ -48,25 +53,35 @@ export function ReportModal({ title, buses, onClose }: ReportModalProps) {
               <div className="mb-5 grid gap-3 md:grid-cols-4">
                 <div className="rounded-lg border bg-card p-3">
                   <p className="text-xs text-muted-foreground">Status</p>
-                  <p className="font-semibold text-foreground">{bus.status}</p>
+
+                  <p className="font-semibold text-foreground">
+                    {bus.status}
+                  </p>
                 </div>
 
                 <div className="rounded-lg border bg-card p-3">
                   <p className="text-xs text-muted-foreground">Mileage</p>
+
                   <p className="font-semibold text-foreground">
                     {bus.mileage.toLocaleString()}
                   </p>
                 </div>
 
                 <div className="rounded-lg border bg-card p-3">
-                  <p className="text-xs text-muted-foreground">Last Service</p>
+                  <p className="text-xs text-muted-foreground">
+                    Last Service
+                  </p>
+
                   <p className="font-semibold text-foreground">
                     {new Date(bus.lastServiceDate).toLocaleDateString()}
                   </p>
                 </div>
 
                 <div className="rounded-lg border bg-card p-3">
-                  <p className="text-xs text-muted-foreground">Next Service</p>
+                  <p className="text-xs text-muted-foreground">
+                    Next Service
+                  </p>
+
                   <p className="font-semibold text-foreground">
                     {new Date(bus.nextServiceDate).toLocaleDateString()}
                   </p>
@@ -75,7 +90,10 @@ export function ReportModal({ title, buses, onClose }: ReportModalProps) {
 
               <div className="space-y-4">
                 {bus.components.map((component) => (
-                  <div key={component.id} className="rounded-lg border bg-card p-4">
+                  <div
+                    key={component.id}
+                    className="rounded-lg border bg-card p-4"
+                  >
                     <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <h4 className="font-bold text-foreground">
@@ -83,14 +101,16 @@ export function ReportModal({ title, buses, onClose }: ReportModalProps) {
                         </h4>
 
                         <p className="text-sm text-muted-foreground">
-                          Status: {component.status} · Health:{" "}
-                          {component.healthPercent}%
+                          Status: {component.status} · Condition:{" "}
+                          {component.conditionLabel}
                         </p>
                       </div>
 
                       <p className="text-xs text-muted-foreground">
                         Last service:{" "}
-                        {new Date(component.lastService).toLocaleDateString()}
+                        {new Date(
+                          component.lastService
+                        ).toLocaleDateString()}
                       </p>
                     </div>
 
@@ -112,8 +132,10 @@ export function ReportModal({ title, buses, onClose }: ReportModalProps) {
                             </div>
 
                             <p className="mt-1 text-xs text-muted-foreground">
-                              {new Date(entry.date).toLocaleDateString()} ·{" "}
-                              {entry.technician}
+                              {new Date(
+                                entry.date
+                              ).toLocaleDateString()}{" "}
+                              · {entry.technician}
                             </p>
 
                             {entry.notes && (

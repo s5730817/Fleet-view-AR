@@ -7,6 +7,7 @@ const authRoutes = require("./routes/auth.route");
 const fleetRoutes = require("./routes/fleet.route");
 const jobRoutes = require("./routes/job.route");
 const summaryRoutes = require("./routes/summary.route");
+const teamRoutes = require("./routes/team.route");
 const { protect } = require("./middleware/auth.middleware");
 const apiLimiter = require('./middleware/rateLimiter.middleware');
 
