@@ -1,7 +1,7 @@
 [] - Need to fix AR side UI
 [] - Fix an issue where something get's logged offline, and all modals freeze in "saving" stata
 [] - Add "Reject" button to managers approval tab (for fixes logged from offline)
-[] - Simplify UI
+[+] - Simplify UI
 [] - Document how offline flow works
 [] - Resolve cache on start up of PWA for offling application. 
 [] - NO 2FA in DB server dev. 

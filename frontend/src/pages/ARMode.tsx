@@ -33,9 +33,9 @@ const ARMode = () => {
   if (!isOnline) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <div className="space-y-4 rounded-2xl border bg-card p-6 text-center shadow-sm">
-          <p className="text-lg font-bold text-foreground">AR mode is unavailable offline</p>
-          <p className="text-sm text-muted-foreground">
+        <div className="space-y-4 rounded-2xl border border-white/15 bg-black/80 p-6 text-center text-white shadow-xl backdrop-blur">
+          <p className="text-lg font-bold text-white">AR mode is unavailable offline</p>
+          <p className="text-sm text-white/70">
             Use the component cards on the bus detail page to log an issue or record a fix while the device is offline.
           </p>
           <Button onClick={() => navigate(backPath)}>Return to bus detail</Button>
@@ -47,9 +47,9 @@ const ARMode = () => {
   if (!busId) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <div className="space-y-4 rounded-2xl border bg-card p-6 text-center shadow-sm">
-          <p className="text-lg font-bold text-foreground">Missing bus selection</p>
-          <p className="text-sm text-muted-foreground">Open AR mode from a bus detail page so tracking is scoped to that bus.</p>
+        <div className="space-y-4 rounded-2xl border border-white/15 bg-black/80 p-6 text-center text-white shadow-xl backdrop-blur">
+          <p className="text-lg font-bold text-white">Missing bus selection</p>
+          <p className="text-sm text-white/70">Open AR mode from a bus detail page so tracking is scoped to that bus.</p>
           <Button onClick={() => navigate(backPath)}>Return</Button>
         </div>
       </div>
@@ -67,9 +67,9 @@ const ARMode = () => {
   if (error || !data) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <div className="space-y-4 rounded-2xl border bg-card p-6 text-center shadow-sm">
-          <p className="text-lg font-bold text-foreground">Unable to open AR mode</p>
-          <p className="text-sm text-muted-foreground">
+        <div className="space-y-4 rounded-2xl border border-white/15 bg-black/80 p-6 text-center text-white shadow-xl backdrop-blur">
+          <p className="text-lg font-bold text-white">Unable to open AR mode</p>
+          <p className="text-sm text-white/70">
             {error instanceof Error ? error.message : "The AR context for this bus could not be loaded."}
           </p>
           <Button onClick={() => navigate(backPath)}>Return</Button>

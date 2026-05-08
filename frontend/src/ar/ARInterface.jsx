@@ -29,6 +29,7 @@ export default function ARInterface({ arContext, onExit, onIssueCreated }) {
       ...arContext.parts.map((part) => ({
         barcodeValue: part.markerCode,
         name: part.name,
+        status: part.status,
         description: `${part.conditionLabel} · ${part.lifecycleLabel}`,
         issuePoints: part.activeIssues,
         markerType: "part",
@@ -36,6 +37,7 @@ export default function ARInterface({ arContext, onExit, onIssueCreated }) {
       ...arContext.tools.map((tool) => ({
         barcodeValue: tool.markerCode,
         name: tool.name,
+        status: tool.status,
         description: `${tool.depotName} · ${tool.status}`,
         issuePoints: [],
         markerType: "tool",

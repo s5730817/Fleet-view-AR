@@ -1,11 +1,10 @@
 const summaryModel = require("../models/summary.model");
 
-const periodLabels = {
-  week: "This Week",
-  month: "This Month",
-  "3months": "Last 3 Months",
-  "6months": "Last 6 Months",
-  year: "This Year",
+const priorityLabels = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  critical: "Critical"
 };
 
 const statusLabels = {
@@ -21,14 +20,19 @@ const busStatusLabels = {
   out_of_operation: "Out Of Operation",
 };
 
-exports.getSummaryData = async (period = "week") => {
-  const [stats, createdRows, completedRows, statusRows, fleetRows] = await Promise.all([
-    summaryModel.getSummaryStats(period),
-    summaryModel.getCreatedCountsByPeriod(period),
-    summaryModel.getCompletedCountsByPeriod(period),
-    summaryModel.getJobsByStatus(period),
-    summaryModel.getFleetCondition(),
+exports.getSummaryData = async (period = "week", user) => {
+  const normalizedPeriod = normalizePeriod(period);
+  const [stats, createdRows, completedRows, priorityRows, statusRows] = await Promise.all([
+    summaryModel.getSummaryStats(),
+    summaryModel.getCreatedCountsByWeek(),
+    summaryModel.getCompletedCountsByWeek(),
+    summaryModel.getPriorityBreakdown(),
+    summaryModel.getJobsByStatus()
   ]);
+
+  const fleet = await fleetService.getAllBuses(user);
+
+  const fleet = await fleetService.getAllBuses(user);
 
   const createdByPeriod = new Map(createdRows.map((row) => [row.period_start, row.total]));
   const completedByPeriod = new Map(completedRows.map((row) => [row.period_start, row.total]));
@@ -57,15 +61,19 @@ exports.getSummaryData = async (period = "week") => {
     value: row.total,
   }));
 
-  const fleetConditionData = [
-    { name: "Good", value: fleetRows.find((r) => r.status === "Good")?.total || 0 },
-    { name: "Requires Attention", value: fleetRows.find((r) => r.status === "Requires Attention")?.total || 0 },
-    { name: "Out Of Operation", value: fleetRows.find((r) => r.status === "Out Of Operation")?.total || 0 },
-  ];
+  const fleetConditionCounts = fleet.reduce((accumulator, bus) => {
+    const status = bus.status || "Requires Attention";
+    accumulator[status] = (accumulator[status] || 0) + 1;
+    return accumulator;
+  }, {
+    Good: 0,
+    "Requires Attention": 0,
+    "Out Of Operation": 0
+  });
 
   return {
-    period,
-    periodLabel: periodLabels[period] || "This Week",
+    period: normalizedPeriod,
+    periodLabel: periodLabels[normalizedPeriod],
     summaryStats: {
       created: stats.created,
       completed: stats.completed,
@@ -73,10 +81,15 @@ exports.getSummaryData = async (period = "week") => {
       overdue: stats.overdue,
     },
     createdCompletedData,
-    fleetConditionData,
+    priorityData,
+    fleetConditionData: [
+      { name: "Good", value: fleetConditionCounts.Good },
+      { name: "Requires Attention", value: fleetConditionCounts["Requires Attention"] },
+      { name: "Out Of Operation", value: fleetConditionCounts["Out Of Operation"] }
+    ],
     onTimeOverdueData: [
-      { name: "On Time Jobs", value: onTimeCount },
-      { name: "Jobs Overdue", value: stats.overdue },
+      { name: "On Time", value: onTimeCount },
+      { name: "Overdue", value: stats.overdue }
     ],
     jobsByStatusData,
   };

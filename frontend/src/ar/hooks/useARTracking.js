@@ -64,15 +64,15 @@ const ensureCameraAccess = async () => {
  * For every unique barcode ID seen we create:
  *   - An ArMarkerControls-driven markerRoot (raw pose, updated by arContext)
  *   - A stableRoot that is lerped toward markerRoot for smooth rendering
- *   - Gizmo meshes (ring + fill + axes) attached to stableRoot
+ *   - A sprite label attached directly to stableRoot
  *
- * Marker IDs are rendered as sprite labels attached directly to stableRoot,
- * keeping annotation and gizmo in the same 3D transform.
+ * Labels render a large status circle over the marker, while the part
+ * name is rendered in the UI above the aim helper.
  */
 export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) => {
   const arContainerRef = useRef(null);
   const arStateRef = useRef({});
-  // Map<id, { markerRoot, stableRoot, missCount, firstVisible, labelSprite, labelAssigned, labelText }>
+  // Map<id, { markerRoot, stableRoot, missCount, firstVisible, statusSprite, statusColor }>
   const markerEntriesRef = useRef(new Map());
 
   const [trackingMessage, setTrackingMessage] = useState("Point the camera at one or more markers.");
@@ -234,34 +234,70 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
         ctx.closePath();
       };
 
-      const createLabelSprite = (text, assigned) => {
-        const labelCanvas = document.createElement("canvas");
-        labelCanvas.width = 512;
-        labelCanvas.height = 128;
-        const ctx = labelCanvas.getContext("2d");
+      const getThemeColor = (tokenName, fallback) => {
+        const rootStyle = window.getComputedStyle(document.documentElement);
+        const bodyStyle = document.body ? window.getComputedStyle(document.body) : null;
+        const rawValue = bodyStyle?.getPropertyValue(tokenName)?.trim() || rootStyle.getPropertyValue(tokenName).trim();
+
+        return rawValue ? `hsl(${rawValue})` : fallback;
+      };
+
+      const getMarkerAccentColor = (matchedMarker, assigned) => {
+        if (!assigned || !matchedMarker) {
+          return getThemeColor("--muted-foreground", "#94a3b8");
+        }
+
+        if (matchedMarker.markerType === "part") {
+          switch (matchedMarker.status) {
+            case "Good":
+              return getThemeColor("--status-good", "#22c55e");
+            case "Requires Attention":
+            case "Replacement Recommended":
+              return getThemeColor("--status-service", "#f59e0b");
+            case "Under Repair":
+              return getThemeColor("--status-repair", "#ef4444");
+            case "Needs Replacement!":
+            case "Needs Fix or Replacement":
+              return getThemeColor("--status-urgent", "#ef4444");
+            default:
+              return getThemeColor("--status-service", "#f59e0b");
+          }
+        }
+
+        switch (matchedMarker.status) {
+          case "available":
+            return getThemeColor("--status-good", "#22c55e");
+          case "in_use":
+          case "awaiting_return":
+            return getThemeColor("--status-service", "#f59e0b");
+          case "maintenance":
+            return getThemeColor("--status-urgent", "#ef4444");
+          default:
+            return getThemeColor("--status-service", "#f59e0b");
+        }
+      };
+
+      const createStatusSprite = (accentColor) => {
+        const statusCanvas = document.createElement("canvas");
+        statusCanvas.width = 256;
+        statusCanvas.height = 256;
+        const ctx = statusCanvas.getContext("2d");
         if (!ctx) return null;
 
-        const bg = assigned ? "rgba(46,204,113,0.94)" : "rgba(220,53,69,0.94)";
-        ctx.font = "bold 44px sans-serif";
-        const content = String(text || "").trim() || "Unknown";
-        const textW = ctx.measureText(content).width;
-        const boxW = Math.max(220, Math.min(492, textW + 34));
-        const boxX = (512 - boxW) / 2;
-
-        drawRoundedRect(ctx, boxX, 20, boxW, 88, 28);
-        ctx.fillStyle = bg;
+        ctx.beginPath();
+        ctx.arc(128, 128, 92, 0, Math.PI * 2);
+        ctx.fillStyle = accentColor;
+        ctx.globalAlpha = 0.34;
         ctx.fill();
-        ctx.lineWidth = 6;
+        ctx.globalAlpha = 1;
+
+        ctx.beginPath();
+        ctx.arc(128, 128, 92, 0, Math.PI * 2);
+        ctx.lineWidth = 12;
         ctx.strokeStyle = "rgba(255,255,255,0.92)";
         ctx.stroke();
 
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 44px sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(content, 256, 64);
-
-        const texture = new THREE.CanvasTexture(labelCanvas);
+        const texture = new THREE.CanvasTexture(statusCanvas);
         texture.needsUpdate = true;
         texture.minFilter = THREE.LinearFilter;
         const material = new THREE.SpriteMaterial({
@@ -269,58 +305,42 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
           transparent: true,
           depthTest: false,
           depthWrite: false,
+          sizeAttenuation: false,
         });
         const sprite = new THREE.Sprite(material);
-        sprite.scale.set(0.45, 0.22, 1);
-        sprite.position.set(0, 0.24, 0);
-        sprite.renderOrder = 100;
+        sprite.scale.set(0.15, 0.15, 1);
+        sprite.position.set(0, 0.02, 0);
+        sprite.renderOrder = 90;
         return sprite;
       };
 
-      const updateLabelSprite = (entry, labelText, assigned) => {
-        if (entry.labelAssigned === assigned && entry.labelText === labelText && entry.labelSprite) return;
-        if (entry.labelSprite) {
-          if (entry.labelSprite.material?.map) entry.labelSprite.material.map.dispose();
-          entry.labelSprite.material?.dispose();
-          entry.stableRoot.remove(entry.labelSprite);
-          entry.labelSprite = null;
-        }
-
-        const sprite = createLabelSprite(labelText, assigned);
+      const disposeSprite = (root, sprite) => {
         if (!sprite) return;
-        entry.stableRoot.add(sprite);
-        entry.labelSprite = sprite;
-        entry.labelAssigned = assigned;
-        entry.labelText = labelText;
+        if (sprite.material?.map) sprite.material.map.dispose();
+        sprite.material?.dispose();
+        root.remove(sprite);
       };
 
-      /** Build gizmo meshes identical to the original single-marker design. */
-      const createGizmo = () => {
-        const group = new THREE.Group();
+      const updateMarkerSprites = (entry, accentColor) => {
+        if (entry.statusColor === accentColor && entry.statusSprite) {
+          return;
+        }
 
-        const ring = new THREE.Mesh(
-          new THREE.RingGeometry(0.22, 0.28, 48),
-          new THREE.MeshBasicMaterial({ color: 0x00e0ff, side: THREE.DoubleSide, transparent: true, opacity: 0.85 }),
-        );
-        ring.rotation.x = -Math.PI / 2;
-        group.add(ring);
+        if (entry.statusSprite) {
+          disposeSprite(entry.stableRoot, entry.statusSprite);
+          entry.statusSprite = null;
+        }
 
-        const fill = new THREE.Mesh(
-          new THREE.CircleGeometry(0.08, 32),
-          new THREE.MeshBasicMaterial({ color: 0x00e0ff, transparent: true, opacity: 0.22, side: THREE.DoubleSide }),
-        );
-        fill.rotation.x = -Math.PI / 2;
-        group.add(fill);
+        const statusSprite = createStatusSprite(accentColor);
+        if (!statusSprite) return;
 
-        const axes = new THREE.AxesHelper(0.35);
-        axes.position.y = 0.01;
-        group.add(axes);
-
-        return group;
+        entry.stableRoot.add(statusSprite);
+        entry.statusSprite = statusSprite;
+        entry.statusColor = accentColor;
       };
 
       /**
-       * Lazily create ArMarkerControls + markerRoot + stableRoot + gizmo for an ID.
+       * Lazily create ArMarkerControls + markerRoot + stableRoot for an ID.
        * Uses the same options as the original single-marker system.
        */
       const ensureMarkerEntry = (id) => {
@@ -340,17 +360,13 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
         stableRoot.visible = false;
         scene.add(stableRoot);
 
-        const gizmo = createGizmo();
-        stableRoot.add(gizmo);
-
         markerEntriesRef.current.set(id, {
           markerRoot,
           stableRoot,
           missCount: 0,
           firstVisible: true,
-          labelSprite: null,
-          labelAssigned: null,
-          labelText: "",
+          statusSprite: null,
+          statusColor: "",
         });
       };
 
@@ -423,8 +439,8 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
             continue;
           }
 
-          const labelText = matchedMarker?.name?.trim() ? matchedMarker.name.trim() : `#${id}`;
-          updateLabelSprite(entry, labelText, assigned);
+          const accentColor = getMarkerAccentColor(matchedMarker, assigned);
+          updateMarkerSprites(entry, accentColor);
           projectedPosition.setFromMatrixPosition(stableRoot.matrixWorld).project(camera);
           const screenX = ((projectedPosition.x + 1) / 2) * viewportWidth;
           const screenY = ((1 - projectedPosition.y) / 2) * viewportHeight;
