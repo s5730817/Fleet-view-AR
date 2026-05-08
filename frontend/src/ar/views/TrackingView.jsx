@@ -47,17 +47,32 @@ export function TrackingView({
     () => parts.filter((part) => detectedMarkerIds.has(part.markerCode)),
     [parts, detectedMarkerIds],
   );
+  const aimedTool = useMemo(
+    () => (detectedMarkers || [])
+      .filter((marker) => marker.assigned && marker.markerType === "tool" && marker.inAim)
+      .sort((left, right) => left.distanceToCenter - right.distanceToCenter)[0] || null,
+    [detectedMarkers],
+  );
   const selectedPart = useMemo(
     () => parts.find((part) => part.id === selectedPartId) || aimedPart || detectedPartMarkers[0] || null,
     [parts, selectedPartId, aimedPart, detectedPartMarkers],
+  );
+  const isFixableIssue = (issue) => issue?.status !== "resolved" && issue?.status !== "awaiting_approval";
+  const aimedPartFixableIssues = useMemo(
+    () => (aimedPart?.activeIssues || []).filter(isFixableIssue),
+    [aimedPart],
+  );
+  const selectedPartFixableIssues = useMemo(
+    () => (selectedPart?.activeIssues || []).filter(isFixableIssue),
+    [selectedPart],
   );
   const selectedIssueType = useMemo(
     () => selectedPart?.issueTypeOptions.find((option) => option.id === selectedIssueTypeId) || selectedPart?.issueTypeOptions[0] || null,
     [selectedIssueTypeId, selectedPart],
   );
   const selectedRepairIssue = useMemo(
-    () => selectedPart?.activeIssues.find((issue) => issue.id === selectedRepairIssueId) || selectedPart?.activeIssues[0] || null,
-    [selectedPart, selectedRepairIssueId],
+    () => selectedPartFixableIssues.find((issue) => issue.id === selectedRepairIssueId) || selectedPartFixableIssues[0] || null,
+    [selectedPartFixableIssues, selectedRepairIssueId],
   );
   const detectedToolNames = useMemo(
     () => detectedTools.map((tool) => tool.name),
@@ -74,6 +89,23 @@ export function TrackingView({
     && ["due_soon", "due_today", "overdue"].includes(selectedPart.maintenanceIndicator?.state)
   );
   const headerTrackingMessage = trackingMessage?.startsWith("No markers detected") ? "" : trackingMessage;
+  const modalFieldClassName = "w-full rounded-md border border-white/15 bg-black/65 px-3 py-2 text-sm text-white placeholder:text-white/35";
+  const modalTextAreaStyle = {
+    backgroundColor: "rgba(5, 7, 11, 0.92)",
+    color: "#ffffff",
+    WebkitTextFillColor: "#ffffff",
+    caretColor: "#ffffff",
+  };
+  const modalSelectStyle = {
+    colorScheme: "dark",
+    backgroundColor: "rgba(5, 7, 11, 0.92)",
+    color: "#ffffff",
+  };
+  const modalOptionStyle = {
+    backgroundColor: "#05070b",
+    color: "#ffffff",
+  };
+  const aimedLabel = aimedPart?.name || aimedTool?.name || null;
 
   useEffect(() => {
     if (!repairWorkflow) {
@@ -182,9 +214,9 @@ export function TrackingView({
     setSelectedPartId(aimedPart.id);
     setSelectedIssueTypeId(aimedPart.issueTypeOptions[0]?.id || "");
     setSelectedAssigneeId("");
-    setSelectedRepairIssueId(aimedPart.activeIssues[0]?.id || "");
+    setSelectedRepairIssueId(aimedPartFixableIssues[0]?.id || "");
     setEngineerActionMode(
-      aimedPart.activeIssues.length > 0
+      aimedPartFixableIssues.length > 0
         ? "fix"
         : ["due_soon", "due_today", "overdue"].includes(aimedPart.maintenanceIndicator?.state)
           ? "approve"
@@ -336,17 +368,16 @@ export function TrackingView({
             boxShadow: "0 0 0 9999px rgba(7, 10, 15, 0.34)",
           }}
         >
-          {aimedPart && (
-            <div className="absolute left-1/2 top-0 w-max max-w-[min(84vw,360px)] -translate-x-1/2 -translate-y-[calc(100%+1.5rem)] rounded-full border border-white/15 bg-black/80 px-5 py-2.5 text-center text-lg font-semibold text-white shadow-lg backdrop-blur md:text-xl">
-              <span className="block truncate">{aimedPart.name}</span>
+          {aimedLabel && (
+            <div className="absolute left-1/2 top-0 w-max max-w-[min(84vw,360px)] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/15 bg-black/92 px-5 py-2.5 text-center text-lg font-semibold text-white shadow-lg backdrop-blur md:text-xl">
+              <span className="block truncate">{aimedLabel}</span>
             </div>
           )}
-          <div className="absolute inset-4 rounded-[18px] border border-white/20" />
         </div>
       )}
 
       <div className="pointer-events-none fixed inset-x-0 top-0 z-[1002] p-4">
-        <div className="pointer-events-auto mx-auto flex w-full max-w-6xl flex-wrap items-center gap-3 rounded-2xl border border-white/15 bg-black/55 px-4 py-3 backdrop-blur">
+        <div className="pointer-events-auto mx-auto flex w-full max-w-6xl flex-wrap items-center gap-3 rounded-2xl border border-white/15 bg-black/82 px-4 py-3 backdrop-blur">
           <button
             type="button"
             onClick={onExit}
@@ -366,17 +397,19 @@ export function TrackingView({
           )}
 
           {isEngineerView && !repairWorkflow && (
-            <div className="w-full rounded-xl border border-white/10 bg-black/35 px-3 py-2 text-xs text-white/80 md:hidden">
+            <div className="w-full rounded-xl border border-white/10 bg-black/65 px-3 py-2 text-xs text-white/85 md:hidden">
               {aimedPart
-                ? `${aimedPart.name} in aim${aimedPart.activeIssues.length > 0 ? ` · ${aimedPart.activeIssues.length} active issue${aimedPart.activeIssues.length === 1 ? "" : "s"}` : canApproveSelectedPart ? ` · ${aimedPart.maintenanceIndicator.label}` : " · ready for action"}`
-                : "Center a part marker inside the aim helper."}
+                ? `${aimedPart.name} in aim${aimedPartFixableIssues.length > 0 ? ` · ${aimedPartFixableIssues.length} active issue${aimedPartFixableIssues.length === 1 ? "" : "s"}` : canApproveSelectedPart ? ` · ${aimedPart.maintenanceIndicator.label}` : " · ready for action"}`
+                : aimedTool
+                  ? `${aimedTool.name} in aim`
+                  : "Center a part or tool marker inside the aim helper."}
             </div>
           )}
         </div>
       </div>
 
       {isEngineerView && !repairWorkflow && (
-        <div className="pointer-events-none fixed right-4 top-24 z-[1003] hidden w-[min(360px,calc(100vw-2rem))] rounded-2xl border border-white/15 bg-black/55 p-4 shadow-2xl backdrop-blur md:block">
+        <div className="pointer-events-none fixed right-4 top-24 z-[1003] hidden w-[min(360px,calc(100vw-2rem))] rounded-2xl border border-white/15 bg-black/82 p-4 shadow-2xl backdrop-blur md:block">
           <div className="pointer-events-auto space-y-3">
             {aimedPart ? (
               <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-sm text-white">
@@ -391,21 +424,21 @@ export function TrackingView({
                   </span>
                 </div>
                 <div className="mt-3 text-xs text-white/80">
-                  {aimedPart.activeIssues.length > 0
-                    ? `${aimedPart.activeIssues.length} active issue${aimedPart.activeIssues.length === 1 ? "" : "s"} available for guided repair.`
+                  {aimedPartFixableIssues.length > 0
+                    ? `${aimedPartFixableIssues.length} active issue${aimedPartFixableIssues.length === 1 ? "" : "s"} available for guided repair.`
                     : canApproveSelectedPart
                       ? `No active issues. ${aimedPart.maintenanceIndicator.label} can be approved from the action menu.`
                       : "No active issues yet. Log a new issue from the action menu."}
                 </div>
               </div>
             ) : (
-              <div className="rounded-xl border border-white/10 bg-black/35 p-4 text-sm text-white/75">
+              <div className="rounded-xl border border-white/10 bg-black/65 p-4 text-sm text-white/80">
                 Center a part marker inside the aim helper to continue.
               </div>
             )}
 
             {detectedTools.length > 0 && (
-              <div className="rounded-xl border border-white/10 bg-black/35 p-3 text-xs text-white/75">
+              <div className="rounded-xl border border-white/10 bg-black/65 p-3 text-xs text-white/80">
                 <p className="font-semibold text-white">Detected tools</p>
                 <p className="mt-1">{detectedTools.map((tool) => tool.name).join(", ")}</p>
               </div>
@@ -416,7 +449,7 @@ export function TrackingView({
 
       {repairWorkflow && (
         <div
-          className="pointer-events-none fixed inset-x-0 bottom-0 z-[1004] border-t border-white/15 bg-black/75 p-4 pb-6 shadow-2xl backdrop-blur md:inset-x-auto md:bottom-auto md:right-4 md:top-24 md:w-[min(360px,calc(100vw-2rem))] md:rounded-2xl md:border md:border-white/15"
+          className="pointer-events-none fixed inset-x-0 bottom-0 z-[1004] border-t border-white/15 bg-black/88 p-4 pb-6 shadow-2xl backdrop-blur md:inset-x-auto md:bottom-auto md:right-4 md:top-24 md:w-[min(360px,calc(100vw-2rem))] md:rounded-2xl md:border md:border-white/15"
           style={{ paddingBottom: "max(1.5rem, calc(env(safe-area-inset-bottom) + 0.75rem))" }}
         >
           <div className="pointer-events-auto mx-auto max-h-[min(48vh,420px)] w-full max-w-5xl space-y-3 overflow-y-auto text-sm text-white md:mx-0 md:max-h-none md:max-w-none">
@@ -432,21 +465,21 @@ export function TrackingView({
                   setRepairWorkflow(null);
                   setCurrentStepChecked(false);
                 }}
-                className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/80"
+                className="rounded-full border border-white/15 bg-black/60 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/85"
               >
                 Cancel
               </button>
             </div>
 
             {!repairWorkflow.toolsConfirmed ? (
-              <div className="space-y-2 rounded-xl border border-white/10 bg-black/35 p-3">
+              <div className="space-y-2 rounded-xl border border-white/10 bg-black/60 p-3">
                 <p className="font-semibold text-white">Find required tools</p>
                 <ul className="space-y-2 text-xs text-white/80">
                   {(repairWorkflow.guide.requiredToolTypes || []).map((toolName) => {
                     const found = (repairWorkflow.foundToolTypes || []).includes(toolName);
 
                     return (
-                      <li key={toolName} className={`rounded-lg border px-3 py-2 ${found ? "border-emerald-300/30 bg-emerald-500/10 text-emerald-100 line-through" : "border-white/10 bg-black/20"}`}>
+                      <li key={toolName} className={`rounded-lg border px-3 py-2 ${found ? "border-emerald-300/30 bg-emerald-500/10 text-emerald-100 line-through" : "border-white/10 bg-black/45"}`}>
                         {toolName}
                       </li>
                     );
@@ -457,12 +490,12 @@ export function TrackingView({
                 )}
               </div>
             ) : (
-              <div className="space-y-3 rounded-xl border border-white/10 bg-black/35 p-3">
+              <div className="space-y-3 rounded-xl border border-white/10 bg-black/60 p-3">
                 <p className="font-semibold text-white">{repairWorkflow.guide.title}</p>
                 {currentWorkflowStep ? (
                   <>
                     <p className="text-xs text-white/70">Step {repairWorkflow.currentStepIndex + 1} of {Math.max(workflowSteps.length, 1)}</p>
-                    <label className="flex items-start gap-3 rounded-lg border border-white/10 bg-black/25 p-3 text-xs text-white/85">
+                    <label className="flex items-start gap-3 rounded-lg border border-white/10 bg-black/45 p-3 text-xs text-white/90">
                       <input
                         type="checkbox"
                         checked={currentStepChecked}
@@ -536,14 +569,14 @@ export function TrackingView({
       </div>
 
       {arError && (
-        <div className="fixed inset-x-4 bottom-40 z-[1003] rounded-lg bg-black/70 px-3 py-2 text-xs text-red-300 md:inset-x-auto md:bottom-auto md:right-4 md:top-24">
+        <div className="fixed inset-x-4 bottom-40 z-[1003] rounded-lg bg-black/88 px-3 py-2 text-xs text-red-300 md:inset-x-auto md:bottom-auto md:right-4 md:top-24">
           AR error: {arError}
         </div>
       )}
 
       {isIssueOpen && (
-        <div className="fixed inset-0 z-[1005] overflow-y-auto bg-black/70 p-4">
-          <div className="mx-auto mt-4 w-full max-w-md rounded-xl border border-white/15 bg-black/85 p-4 text-white shadow-xl backdrop-blur sm:mt-10">
+        <div className="fixed inset-0 z-[1005] overflow-y-auto bg-black/82 p-4">
+          <div className="mx-auto mt-4 w-full max-w-md rounded-xl border border-white/15 bg-black/94 p-4 text-white shadow-xl backdrop-blur sm:mt-10">
             <h3 className="text-lg font-bold">Add Issue To Bus Part</h3>
             <p className="mt-1 text-sm text-white/70">
               Select the bus part and issue type. The mechanic overlay will use the linked guide automatically.
@@ -558,10 +591,11 @@ export function TrackingView({
                   setSelectedPartId(nextPart?.id || null);
                   setSelectedIssueTypeId(nextPart?.issueTypeOptions[0]?.id || "");
                 }}
-                className="w-full rounded-md border border-white/15 bg-black/40 px-3 py-2 text-sm text-white"
+                className={modalFieldClassName}
+                style={modalSelectStyle}
               >
                 {(detectedPartMarkers.length > 0 ? detectedPartMarkers : parts).map((part) => (
-                  <option key={part.id} value={part.id}>
+                  <option key={part.id} value={part.id} style={modalOptionStyle}>
                     {part.name} · marker {part.markerCode}
                   </option>
                 ))}
@@ -570,11 +604,12 @@ export function TrackingView({
               <select
                 value={selectedIssueType?.id || ""}
                 onChange={(event) => setSelectedIssueTypeId(event.target.value)}
-                className="w-full rounded-md border border-white/15 bg-black/40 px-3 py-2 text-sm text-white"
+                className={modalFieldClassName}
+                style={modalSelectStyle}
               >
                 {(selectedPart?.issueTypeOptions || []).map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label} · {option.recommendedAction} · {option.priority}
+                  <option key={option.id} value={option.id} style={modalOptionStyle}>
+                    {option.label} · {option.recommendedAction}
                   </option>
                 ))}
               </select>
@@ -582,10 +617,11 @@ export function TrackingView({
               <select
                 value={selectedAssigneeId}
                 onChange={(event) => setSelectedAssigneeId(event.target.value)}
-                className="w-full rounded-md border border-white/15 bg-black/40 px-3 py-2 text-sm text-white"
+                className={modalFieldClassName}
+                style={modalSelectStyle}
               >
                 {issueAssignableUsers.map((user) => (
-                  <option key={user.id} value={user.id}>
+                  <option key={user.id} value={user.id} style={modalOptionStyle}>
                     {user.name} · {user.role}
                   </option>
                 ))}
@@ -596,7 +632,7 @@ export function TrackingView({
               )}
 
               {selectedIssueType && (
-                <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
+                <div className="rounded-lg border border-white/10 bg-black/60 p-3 text-sm">
                   <p className="font-semibold text-white">{selectedIssueType.label}</p>
                   <p className="mt-1 text-white/70">{selectedIssueType.summary}</p>
                   <p className="mt-2 text-xs text-white/60">
@@ -610,15 +646,16 @@ export function TrackingView({
                 onChange={(event) => setIssueNote(event.target.value)}
                 placeholder="Initial note for mechanics (optional)"
                 rows={3}
-                className="w-full rounded-md border border-white/15 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/35"
+                className={modalFieldClassName}
+                style={modalTextAreaStyle}
               />
             </div>
 
-            <div className="sticky bottom-0 mt-4 flex justify-end gap-2 bg-black/85 pt-2">
+            <div className="sticky bottom-0 mt-4 flex justify-end gap-2 bg-black/94 pt-2">
               <button
                 type="button"
                 onClick={() => setIsIssueOpen(false)}
-                className="rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm font-semibold text-white"
+                className="rounded-md border border-white/15 bg-black/60 px-3 py-2 text-sm font-semibold text-white"
               >
                 Cancel
               </button>
@@ -636,8 +673,8 @@ export function TrackingView({
       )}
 
       {isEngineerActionOpen && (
-        <div className="fixed inset-0 z-[1005] overflow-y-auto bg-black/70 p-4">
-          <div className="mx-auto mt-4 w-full max-w-md rounded-xl border border-white/15 bg-black/85 p-4 text-white shadow-xl backdrop-blur sm:mt-10">
+        <div className="fixed inset-0 z-[1005] overflow-y-auto bg-black/82 p-4">
+          <div className="mx-auto mt-4 w-full max-w-md rounded-xl border border-white/15 bg-black/94 p-4 text-white shadow-xl backdrop-blur sm:mt-10">
             <h3 className="text-lg font-bold">Choose Action For {selectedPart?.name}</h3>
             <p className="mt-1 text-sm text-white/70">
               Log a new issue, start a guided repair/replacement, or approve a due inspection for the part currently in the aim helper.
@@ -647,15 +684,15 @@ export function TrackingView({
               <button
                 type="button"
                 onClick={() => setEngineerActionMode("issue")}
-                className={`flex-1 rounded-md border px-3 py-2 text-sm font-semibold ${engineerActionMode === "issue" ? "border-primary bg-primary/15 text-primary" : "border-white/10 bg-white/5 text-white/80"}`}
+                className={`flex-1 rounded-md border px-3 py-2 text-sm font-semibold ${engineerActionMode === "issue" ? "border-primary bg-primary/15 text-primary" : "border-white/10 bg-black/60 text-white/85"}`}
               >
                 Log Issue
               </button>
               <button
                 type="button"
                 onClick={() => setEngineerActionMode("fix")}
-                disabled={!selectedPart || selectedPart.activeIssues.length === 0}
-                className={`flex-1 rounded-md border px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${engineerActionMode === "fix" ? "border-primary bg-primary/15 text-primary" : "border-white/10 bg-white/5 text-white/80"}`}
+                disabled={!selectedPart || selectedPartFixableIssues.length === 0}
+                className={`flex-1 rounded-md border px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${engineerActionMode === "fix" ? "border-primary bg-primary/15 text-primary" : "border-white/10 bg-black/60 text-white/85"}`}
               >
                 Fix
               </button>
@@ -663,7 +700,7 @@ export function TrackingView({
                 type="button"
                 onClick={() => setEngineerActionMode("approve")}
                 disabled={!canApproveSelectedPart}
-                className={`flex-1 rounded-md border px-3 py-2 text-sm font-semibold ${engineerActionMode === "approve" ? "border-primary bg-primary/15 text-primary" : "border-white/10 bg-white/5 text-white/80"} disabled:cursor-not-allowed disabled:opacity-50`}
+                className={`flex-1 rounded-md border px-3 py-2 text-sm font-semibold ${engineerActionMode === "approve" ? "border-primary bg-primary/15 text-primary" : "border-white/10 bg-black/60 text-white/85"} disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 Approve
               </button>
@@ -675,16 +712,17 @@ export function TrackingView({
                   <select
                     value={selectedIssueType?.id || ""}
                     onChange={(event) => setSelectedIssueTypeId(event.target.value)}
-                    className="w-full rounded-md border border-white/15 bg-black/40 px-3 py-2 text-sm text-white"
+                    className={modalFieldClassName}
+                    style={modalSelectStyle}
                   >
                     {(selectedPart?.issueTypeOptions || []).map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label} · {option.recommendedAction} · {option.priority}
+                      <option key={option.id} value={option.id} style={modalOptionStyle}>
+                        {option.label} · {option.recommendedAction}
                       </option>
                     ))}
                   </select>
                   {selectedIssueType && (
-                    <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
+                    <div className="rounded-lg border border-white/10 bg-black/60 p-3 text-sm">
                       <p className="font-semibold text-white">{selectedIssueType.label}</p>
                       <p className="mt-1 text-white/70">{selectedIssueType.summary}</p>
                       <p className="mt-2 text-xs text-white/60">
@@ -695,22 +733,23 @@ export function TrackingView({
                 </>
               ) : engineerActionMode === "fix" ? (
                 <>
-                  {selectedPart?.activeIssues.length > 0 ? (
+                  {selectedPartFixableIssues.length > 0 ? (
                     <>
                       <select
                         value={selectedRepairIssue?.id || ""}
                         onChange={(event) => setSelectedRepairIssueId(event.target.value)}
-                        className="w-full rounded-md border border-white/15 bg-black/40 px-3 py-2 text-sm text-white"
+                        className={modalFieldClassName}
+                        style={modalSelectStyle}
                       >
-                        {selectedPart.activeIssues.map((issue) => (
-                          <option key={issue.id} value={issue.id}>
-                            {issue.title} · {issue.recommendedAction} · {issue.status}
+                        {selectedPartFixableIssues.map((issue) => (
+                          <option key={issue.id} value={issue.id} style={modalOptionStyle}>
+                            {issue.title} · {issue.recommendedAction}
                           </option>
                         ))}
                       </select>
 
                       {selectedRepairIssue && (
-                        <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
+                        <div className="rounded-lg border border-white/10 bg-black/60 p-3 text-sm">
                           <p className="font-semibold text-white">{selectedRepairIssue.title}</p>
                           <p className="mt-1 text-white/70">{selectedRepairIssue.description || selectedRepairIssue.issueTypeLabel}</p>
                           <p className="mt-2 text-xs text-white/60">
@@ -723,13 +762,13 @@ export function TrackingView({
                       )}
                     </>
                   ) : (
-                    <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-white/65">
+                    <div className="rounded-lg border border-white/10 bg-black/60 p-3 text-sm text-white/65">
                       There are no active issues on this part to repair yet. Log a new issue first.
                     </div>
                   )}
                 </>
               ) : (
-                <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
+                <div className="rounded-lg border border-white/10 bg-black/60 p-3 text-sm">
                   {canApproveSelectedPart ? (
                     <>
                       <p className="font-semibold text-white">Approve inspection with no fault found</p>
@@ -753,15 +792,16 @@ export function TrackingView({
                 onChange={(event) => setIssueNote(event.target.value)}
                 placeholder={engineerActionMode === "approve" ? "Add an inspection note (optional)" : "Add an initial note (optional)"}
                 rows={3}
-                className="w-full rounded-md border border-white/15 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/35"
+                className={modalFieldClassName}
+                style={modalTextAreaStyle}
               />
             </div>
 
-            <div className="sticky bottom-0 mt-4 flex justify-end gap-2 bg-black/85 pt-2">
+            <div className="sticky bottom-0 mt-4 flex justify-end gap-2 bg-black/94 pt-2">
               <button
                 type="button"
                 onClick={() => setIsEngineerActionOpen(false)}
-                className="rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm font-semibold text-white"
+                className="rounded-md border border-white/15 bg-black/60 px-3 py-2 text-sm font-semibold text-white"
               >
                 Cancel
               </button>

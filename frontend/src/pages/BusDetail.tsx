@@ -15,6 +15,7 @@ import { HistoryModal } from "@/components/HistoryModal";
 import { MaintenanceLogModal } from "@/components/MaintenanceLogModal";
 import { IssueLogModal } from "@/components/IssueLogModal";
 import { Button } from "@/components/ui/button";
+import { operationRequiresManagerApproval } from "@/lib/offline-review";
 import {
   ArrowLeft,
   Bus as BusIcon,
@@ -25,6 +26,7 @@ import {
   AlertTriangle,
   RefreshCw,
   CheckCircle2,
+  XCircle,
   WifiOff,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -66,7 +68,7 @@ const BusDetail = () => {
   const [logComponent, setLogComponent] = useState<BusComponent | null>(null);
   const [issueComponent, setIssueComponent] = useState<BusComponent | null>(null);
   const [queueActionId, setQueueActionId] = useState<string | null>(null);
-  const [serverApprovalActionId, setServerApprovalActionId] = useState<string | null>(null);
+  const [serverDecisionActionId, setServerDecisionActionId] = useState<string | null>(null);
   const [modalArContext, setModalArContext] = useState<ARBusPart[] | null>(null);
 
   if (isLoading) {
@@ -229,12 +231,38 @@ const BusDetail = () => {
     }
   };
 
+  const handleApproveQueueItem = async (operationId: string) => {
+    setQueueActionId(operationId);
+
+    try {
+      await retryOperation(operationId);
+      toast.success("Offline fix approved for upload");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to approve offline fix");
+    } finally {
+      setQueueActionId(null);
+    }
+  };
+
+  const handleRejectQueueItem = async (operationId: string) => {
+    setQueueActionId(operationId);
+
+    try {
+      await resolveOperation(operationId, `Rejected by ${role}`);
+      toast.success("Offline fix rejected");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to reject offline fix");
+    } finally {
+      setQueueActionId(null);
+    }
+  };
+
   const handleApproveServerIssue = async (issueId: string) => {
     if (!hasPermission("create")) {
       return;
     }
 
-    setServerApprovalActionId(issueId);
+    setServerDecisionActionId(issueId);
 
     try {
       await updateFaultStatus(
@@ -247,7 +275,29 @@ const BusDetail = () => {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to approve fix");
     } finally {
-      setServerApprovalActionId(null);
+      setServerDecisionActionId(null);
+    }
+  };
+
+  const handleRejectServerIssue = async (issueId: string, previousStatus?: string | null) => {
+    if (!hasPermission("create")) {
+      return;
+    }
+
+    setServerDecisionActionId(issueId);
+
+    try {
+      await updateFaultStatus(
+        issueId,
+        { status: previousStatus || "reported" },
+        { busId: bus.id, busName: bus.name }
+      );
+      refreshBusQueries();
+      toast.success("Fix rejected");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to reject fix");
+    } finally {
+      setServerDecisionActionId(null);
     }
   };
 
@@ -380,6 +430,7 @@ const BusDetail = () => {
           <div className="space-y-3">
             {busOperations.map((operation) => {
               const needsSyncAttention = operation.status === "needs_manager_review";
+              const needsManagerApproval = operationRequiresManagerApproval(operation);
 
               return (
                 <div
@@ -410,23 +461,48 @@ const BusDetail = () => {
 
                     {needsSyncAttention ? (
                       <div className="flex flex-wrap items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => void retryOperation(operation.id)}
-                          disabled={syncInProgress || queueActionId === operation.id}
-                        >
-                          <RefreshCw className="mr-2 h-4 w-4" />
-                          Retry upload
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => void handleDismissQueueItem(operation.id)}
-                          disabled={syncInProgress || queueActionId === operation.id}
-                        >
-                          {queueActionId === operation.id ? "Dismissing..." : "Dismiss"}
-                        </Button>
+                        {needsManagerApproval ? (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void handleApproveQueueItem(operation.id)}
+                              disabled={syncInProgress || queueActionId === operation.id}
+                            >
+                              <CheckCircle2 className="mr-2 h-4 w-4" />
+                              {queueActionId === operation.id ? "Applying..." : "Approve upload"}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => void handleRejectQueueItem(operation.id)}
+                              disabled={syncInProgress || queueActionId === operation.id}
+                            >
+                              <XCircle className="mr-2 h-4 w-4" />
+                              {queueActionId === operation.id ? "Rejecting..." : "Reject"}
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void retryOperation(operation.id)}
+                              disabled={syncInProgress || queueActionId === operation.id}
+                            >
+                              <RefreshCw className="mr-2 h-4 w-4" />
+                              Retry upload
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => void handleDismissQueueItem(operation.id)}
+                              disabled={syncInProgress || queueActionId === operation.id}
+                            >
+                              {queueActionId === operation.id ? "Dismissing..." : "Dismiss"}
+                            </Button>
+                          </>
+                        )}
                       </div>
                     ) : null}
                   </div>
@@ -468,14 +544,25 @@ const BusDetail = () => {
                     <p className="text-sm text-muted-foreground">{issue.latestComment || issue.description}</p>
                   </div>
 
-                  <Button
-                    size="sm"
-                    onClick={() => void handleApproveServerIssue(issue.id)}
-                    disabled={serverApprovalActionId === issue.id}
-                  >
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    {serverApprovalActionId === issue.id ? "Applying..." : "Approve fix"}
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => void handleApproveServerIssue(issue.id)}
+                      disabled={serverDecisionActionId === issue.id}
+                    >
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      {serverDecisionActionId === issue.id ? "Applying..." : "Approve fix"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void handleRejectServerIssue(issue.id, issue.pendingMaintenancePreviousStatus)}
+                      disabled={serverDecisionActionId === issue.id}
+                    >
+                      <XCircle className="mr-2 h-4 w-4" />
+                      {serverDecisionActionId === issue.id ? "Applying..." : "Reject fix"}
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}

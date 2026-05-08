@@ -159,6 +159,7 @@ export interface ARIssue {
   assignedToName: string | null;
   assignedToEmail?: string | null;
   pendingMaintenanceApproval?: boolean;
+  pendingMaintenancePreviousStatus?: string | null;
   guide: ARGuide;
 }
 

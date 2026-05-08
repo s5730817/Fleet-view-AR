@@ -112,6 +112,10 @@ export function Navbar() {
             My Jobs
           </NavLink>
 
+          <NavLink to="/notifications" className={linkClass}>
+            Notifications
+          </NavLink>
+
           {canViewSummary && (
             <NavLink to="/summary" className={linkClass}>
               Summary
@@ -193,6 +197,10 @@ export function Navbar() {
                 My Jobs
               </DropdownMenuItem>
 
+              <DropdownMenuItem onClick={() => navigate("/notifications")}>
+                Notifications
+              </DropdownMenuItem>
+
               {canViewSummary && (
                 <DropdownMenuItem onClick={() => navigate("/summary")}>
                   Summary
@@ -268,10 +276,6 @@ export function Navbar() {
 
               <DropdownMenuItem onClick={() => navigate("/team")}>
                 Team
-              </DropdownMenuItem>
-
-              <DropdownMenuItem onClick={() => navigate("/notifications")}>
-                Notifications
               </DropdownMenuItem>
 
               <DropdownMenuSeparator />

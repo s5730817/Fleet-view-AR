@@ -1,10 +1,11 @@
 const summaryModel = require("../models/summary.model");
 
-const priorityLabels = {
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-  critical: "Critical"
+const periodLabels = {
+  week: "This Week",
+  month: "This Month",
+  "3months": "Last 3 Months",
+  "6months": "Last 6 Months",
+  year: "This Year",
 };
 
 const statusLabels = {
@@ -20,19 +21,49 @@ const busStatusLabels = {
   out_of_operation: "Out Of Operation",
 };
 
+const normalizePeriod = (period) => {
+  if (Object.prototype.hasOwnProperty.call(periodLabels, period)) {
+    return period;
+  }
+
+  return "week";
+};
+
+const formatPeriodDate = (period, value) => {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  if (period === "week") {
+    return date.toLocaleDateString("en-GB", {
+      weekday: "short",
+      day: "numeric",
+    });
+  }
+
+  if (period === "month") {
+    return date.toLocaleDateString("en-GB", {
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  return date.toLocaleDateString("en-GB", {
+    month: "short",
+  });
+};
+
 exports.getSummaryData = async (period = "week", user) => {
   const normalizedPeriod = normalizePeriod(period);
-  const [stats, createdRows, completedRows, priorityRows, statusRows] = await Promise.all([
-    summaryModel.getSummaryStats(),
-    summaryModel.getCreatedCountsByWeek(),
-    summaryModel.getCompletedCountsByWeek(),
-    summaryModel.getPriorityBreakdown(),
-    summaryModel.getJobsByStatus()
+  const [stats, createdRows, completedRows, statusRows, fleetConditionRows] = await Promise.all([
+    summaryModel.getSummaryStats(normalizedPeriod),
+    summaryModel.getCreatedCountsByPeriod(normalizedPeriod),
+    summaryModel.getCompletedCountsByPeriod(normalizedPeriod),
+    summaryModel.getJobsByStatus(normalizedPeriod),
+    summaryModel.getFleetCondition(),
   ]);
-
-  const fleet = await fleetService.getAllBuses(user);
-
-  const fleet = await fleetService.getAllBuses(user);
 
   const createdByPeriod = new Map(createdRows.map((row) => [row.period_start, row.total]));
   const completedByPeriod = new Map(completedRows.map((row) => [row.period_start, row.total]));
@@ -40,11 +71,7 @@ exports.getSummaryData = async (period = "week", user) => {
   const allKeys = [...new Set([...createdByPeriod.keys(), ...completedByPeriod.keys()])].sort();
 
   const createdCompletedData = allKeys.map((key) => ({
-    date: new Date(key).toLocaleDateString("en-GB", {
-      month: "short",
-      day: period === "week" ? "numeric" : undefined,
-      year: period === "year" || period === "6months" ? undefined : undefined,
-    }),
+    date: formatPeriodDate(normalizedPeriod, key),
     created: createdByPeriod.get(key) || 0,
     completed: completedByPeriod.get(key) || 0,
   }));
@@ -61,14 +88,14 @@ exports.getSummaryData = async (period = "week", user) => {
     value: row.total,
   }));
 
-  const fleetConditionCounts = fleet.reduce((accumulator, bus) => {
-    const status = bus.status || "Requires Attention";
-    accumulator[status] = (accumulator[status] || 0) + 1;
+  const fleetConditionCounts = fleetConditionRows.reduce((accumulator, row) => {
+    const label = busStatusLabels[row.status] || row.status || "Requires Attention";
+    accumulator[label] = row.total;
     return accumulator;
   }, {
     Good: 0,
     "Requires Attention": 0,
-    "Out Of Operation": 0
+    "Out Of Operation": 0,
   });
 
   return {
@@ -81,15 +108,14 @@ exports.getSummaryData = async (period = "week", user) => {
       overdue: stats.overdue,
     },
     createdCompletedData,
-    priorityData,
     fleetConditionData: [
       { name: "Good", value: fleetConditionCounts.Good },
       { name: "Requires Attention", value: fleetConditionCounts["Requires Attention"] },
-      { name: "Out Of Operation", value: fleetConditionCounts["Out Of Operation"] }
+      { name: "Out Of Operation", value: fleetConditionCounts["Out Of Operation"] },
     ],
     onTimeOverdueData: [
       { name: "On Time", value: onTimeCount },
-      { name: "Overdue", value: stats.overdue }
+      { name: "Overdue", value: stats.overdue },
     ],
     jobsByStatusData,
   };

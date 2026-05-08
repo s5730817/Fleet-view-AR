@@ -8,6 +8,7 @@ import { AccessibilityProvider } from "@/context/AccessibilityContext";
 import { PermissionProvider } from "@/context/PermissionContext";
 import { SyncStatusProvider } from "@/context/SyncStatusContext";
 import { Navbar } from "@/components/Navbar";
+import { NotificationPopups } from "@/components/NotificationPopups";
 
 import Index from "./pages/Index.tsx";
 import Login from "./pages/Login.tsx";
@@ -64,6 +65,7 @@ const AppRoutes = () => {
   return (
     <>
       {!hideNavbar && <Navbar />}
+      <NotificationPopups />
 
       <Routes>
         <Route path="/" element={<Login />} />
@@ -106,7 +108,7 @@ const App = () => {
           <SyncStatusProvider>
             <TooltipProvider>
               <Toaster />
-              <Sonner />
+              <Sonner position="top-right" />
               <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                 <AppRoutes />
               </BrowserRouter>

@@ -135,6 +135,7 @@ const mapIssueSnapshot = (issue, matchingIssueType) => ({
   assignedToName: issue.assigned_to_name || null,
   assignedToEmail: issue.assigned_to_email || null,
   pendingMaintenanceApproval: Boolean(issue.maintenance_approval_metadata),
+  pendingMaintenancePreviousStatus: issue.maintenance_approval_status_from || null,
 });
 
 const mapBusSummary = (bus, parts, issues) => ({

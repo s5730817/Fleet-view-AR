@@ -427,7 +427,8 @@ exports.getIssuesForPartIds = async (partIds) => {
       assignee.email AS assigned_to_email,
       assignee_role.name AS assigned_to_role,
       latest_comment.description AS latest_comment,
-      latest_approval_request.metadata AS maintenance_approval_metadata
+      latest_approval_request.metadata AS maintenance_approval_metadata,
+      latest_approval_request.status_from AS maintenance_approval_status_from
      FROM issues
      LEFT JOIN issue_types ON issue_types.id = issues.issue_type_id
      LEFT JOIN LATERAL (
@@ -448,7 +449,7 @@ exports.getIssuesForPartIds = async (partIds) => {
        LIMIT 1
      ) AS latest_comment ON TRUE
      LEFT JOIN LATERAL (
-       SELECT metadata
+       SELECT metadata, status_from
        FROM issue_updates
        WHERE issue_updates.issue_id = issues.id
          AND issue_updates.metadata ->> 'kind' = 'maintenance_approval_request'

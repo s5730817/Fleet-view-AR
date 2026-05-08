@@ -80,8 +80,13 @@ export function MaintenanceLogModal({ open, onClose, component, busName, technic
       : [];
   }, [currentUser.email, currentUser.id, currentUser.name, role, technicians]);
 
-  const requiresIssueSelection = type !== "service" && activeIssues.length > 0;
-  const selectedIssue = activeIssues.find((issue) => issue.id === selectedIssueId) || null;
+  const fixableIssues = useMemo(
+    () => activeIssues.filter((issue) => issue.status !== "resolved" && issue.status !== "awaiting_approval"),
+    [activeIssues]
+  );
+
+  const requiresIssueSelection = type !== "service" && fixableIssues.length > 0;
+  const selectedIssue = fixableIssues.find((issue) => issue.id === selectedIssueId) || null;
 
   useEffect(() => {
     if (!open) {
@@ -100,19 +105,19 @@ export function MaintenanceLogModal({ open, onClose, component, busName, technic
       return;
     }
 
-    if (type === "service" || activeIssues.length === 0) {
+    if (type === "service" || fixableIssues.length === 0) {
       setSelectedIssueId("");
       return;
     }
 
     setSelectedIssueId((currentIssueId) => {
-      if (activeIssues.some((issue) => issue.id === currentIssueId)) {
+      if (fixableIssues.some((issue) => issue.id === currentIssueId)) {
         return currentIssueId;
       }
 
-      return activeIssues[0]?.id || "";
+      return fixableIssues[0]?.id || "";
     });
-  }, [activeIssues, open, type]);
+  }, [fixableIssues, open, type]);
 
   const handleSubmit = async () => {
     if (!description || !technicianUserId) {
@@ -203,16 +208,16 @@ export function MaintenanceLogModal({ open, onClose, component, busName, technic
           {type !== "service" && (
             <div>
               <Label className="text-xs">Resolve Issue</Label>
-              {activeIssues.length > 0 ? (
+              {fixableIssues.length > 0 ? (
                 <>
                   <Select value={selectedIssueId} onValueChange={setSelectedIssueId}>
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Choose active issue" />
                     </SelectTrigger>
                     <SelectContent>
-                      {activeIssues.map((issue) => (
+                      {fixableIssues.map((issue) => (
                         <SelectItem key={issue.id} value={issue.id}>
-                          {issue.title} - {issue.recommendedAction} - {issue.status}
+                          {issue.title} - {issue.recommendedAction}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -245,7 +250,7 @@ export function MaintenanceLogModal({ open, onClose, component, busName, technic
               <SelectContent>
                 {availableTechnicians.map((technician) => (
                   <SelectItem key={technician.id} value={technician.id}>
-                    {technician.name} - {technician.email}
+                    {technician.name}
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -134,7 +134,7 @@ export function IssueLogModal({
               <SelectContent>
                 {(issuePart?.issueTypeOptions || []).map((option) => (
                   <SelectItem key={option.id} value={option.id}>
-                    {option.label} - {option.recommendedAction} - {option.priority}
+                    {option.label} - {option.recommendedAction}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -161,7 +161,7 @@ export function IssueLogModal({
                   <SelectContent>
                     {engineerAssignees.map((user) => (
                       <SelectItem key={user.id} value={user.id}>
-                        {user.name} - {user.role}
+                        {user.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
