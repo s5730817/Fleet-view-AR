@@ -29,8 +29,41 @@ const normalizePeriod = (period) => {
   return "week";
 };
 
+const padDatePart = (value) => String(value).padStart(2, "0");
+
+const buildLocalDateKey = (date) => {
+  return [
+    date.getFullYear(),
+    padDatePart(date.getMonth() + 1),
+    padDatePart(date.getDate()),
+  ].join("-");
+};
+
+const parseNormalizedDate = (value) => {
+  if (typeof value === "string") {
+    const parts = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+    if (parts) {
+      const [, year, month, day] = parts;
+      return new Date(Number(year), Number(month) - 1, Number(day));
+    }
+  }
+
+  return new Date(value);
+};
+
+const normalizePeriodKey = (value) => {
+  const date = parseNormalizedDate(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return buildLocalDateKey(date);
+};
+
 const formatPeriodDate = (period, value) => {
-  const date = new Date(value);
+  const date = parseNormalizedDate(value);
 
   if (Number.isNaN(date.getTime())) {
     return String(value);
@@ -65,10 +98,16 @@ exports.getSummaryData = async (period = "week", user) => {
     summaryModel.getFleetCondition(),
   ]);
 
-  const createdByPeriod = new Map(createdRows.map((row) => [row.period_start, row.total]));
-  const completedByPeriod = new Map(completedRows.map((row) => [row.period_start, row.total]));
+  const createdByPeriod = new Map(
+    createdRows.map((row) => [normalizePeriodKey(row.period_start), row.total])
+  );
+  const completedByPeriod = new Map(
+    completedRows.map((row) => [normalizePeriodKey(row.period_start), row.total])
+  );
 
-  const allKeys = [...new Set([...createdByPeriod.keys(), ...completedByPeriod.keys()])].sort();
+  const allKeys = [...new Set([...createdByPeriod.keys(), ...completedByPeriod.keys()])].sort(
+    (left, right) => new Date(left).getTime() - new Date(right).getTime()
+  );
 
   const createdCompletedData = allKeys.map((key) => ({
     date: formatPeriodDate(normalizedPeriod, key),

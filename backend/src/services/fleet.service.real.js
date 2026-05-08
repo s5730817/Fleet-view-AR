@@ -6,14 +6,10 @@ const {
   resolvePartCode
 } = require("../utils/arIssueCatalog");
 const {
-  COMPONENT_INDICATOR_LABELS,
-  COMPONENT_STATUS_LABELS,
-  deriveComponentPresentation,
-  deriveBusMaintenanceSummary,
-  LIFECYCLE_LABELS,
-  normalizeLifecycleState,
-  normalizeComponentState
-} = require("../utils/maintenanceStatus");
+  buildComponentPresentationFields,
+  buildBusMaintenanceFields,
+  buildBusMaintenanceStatus
+} = require("./fleetPresentation.shared");
 
 const formatDate = (value) => {
   if (!value) {
@@ -144,7 +140,7 @@ const mapBusSummary = (bus, parts, issues) => ({
   plateNumber: bus.registration_number,
   depotId: bus.depot_id || null,
   depotName: bus.depot_name || null,
-  status: deriveBusMaintenanceSummary({
+  status: buildBusMaintenanceStatus({
     nextServiceAt: bus.next_service_at,
     issues,
     components: parts.map((part) => ({
@@ -185,7 +181,7 @@ const mapPart = (part, entriesByPartId, issuesByPartId, policyByPartCode) => {
   const partCode = resolvePartCode(part.name, part.icon_key);
   const activeIssues = issuesByPartId.get(part.id) || [];
   const lifecyclePolicy = policyByPartCode.get(partCode) || null;
-  const presentation = deriveComponentPresentation({
+  const presentation = buildComponentPresentationFields({
     conditionState: part.condition_state,
     lifecycleState: part.lifecycle_state,
     issues: activeIssues,
@@ -194,12 +190,6 @@ const mapPart = (part, entriesByPartId, issuesByPartId, policyByPartCode) => {
       ? lifecyclePolicy.inspection_interval_days ?? null
       : null
   });
-  const normalizedState = normalizeComponentState({
-    conditionState: part.condition_state
-  });
-  const normalizedLifecycleState = normalizeLifecycleState({
-    lifecycleState: part.lifecycle_state
-  });
 
   return {
     id: part.id,
@@ -207,16 +197,7 @@ const mapPart = (part, entriesByPartId, issuesByPartId, policyByPartCode) => {
     name: part.name,
     markerCode: part.marker_code,
     icon: part.icon_key || "Wrench",
-    status: presentation.status,
-    statusState: presentation.statusState,
-    statusNote: presentation.statusNote,
-    conditionState: normalizedState,
-    conditionLabel: COMPONENT_STATUS_LABELS[normalizedState] || COMPONENT_INDICATOR_LABELS[normalizedState],
-    lifecycleState: normalizedLifecycleState,
-    lifecycleLabel: LIFECYCLE_LABELS[normalizedLifecycleState],
-    maintenanceIndicator: presentation.maintenanceIndicator,
-    activeIssueCount: presentation.activeIssueCount,
-    inProgressIssueCount: presentation.inProgressIssueCount,
+    ...presentation,
     lastRepair: formatDate(part.last_repair_at),
     lastInspected: formatDate(part.last_inspected_at),
     lastService: formatDate(part.last_service_at),
@@ -228,7 +209,7 @@ const mapPart = (part, entriesByPartId, issuesByPartId, policyByPartCode) => {
 
 const mapBus = (bus, partsByBusId, entriesByPartId, issuesByPartId, policyByPartCode, issues) => {
   const mappedParts = (partsByBusId.get(bus.id) || []).map((part) => mapPart(part, entriesByPartId, issuesByPartId, policyByPartCode));
-  const maintenanceSummary = deriveBusMaintenanceSummary({
+  const maintenanceSummary = buildBusMaintenanceFields({
     nextServiceAt: bus.next_service_at,
     issues,
     components: mappedParts
@@ -400,7 +381,7 @@ exports.getARContext = async (id, user) => {
       plateNumber: bus.registration_number,
       depotId: bus.depot_id || null,
       depotName: bus.depot_name || null,
-      status: deriveBusMaintenanceSummary({
+      status: buildBusMaintenanceStatus({
         nextServiceAt: bus.next_service_at,
         issues,
         components: parts.map((part) => ({
@@ -432,7 +413,7 @@ exports.getARContext = async (id, user) => {
         markerCode: part.marker_code,
         icon: part.icon_key || "Wrench",
         ...(() => {
-          const presentation = deriveComponentPresentation({
+          const presentation = buildComponentPresentationFields({
             conditionState: part.condition_state,
             lifecycleState: part.lifecycle_state,
             issues: issuesByPartId.get(part.id) || [],
@@ -445,20 +426,12 @@ exports.getARContext = async (id, user) => {
           return {
             status: presentation.status,
             maintenanceIndicator: presentation.maintenanceIndicator,
+            conditionState: presentation.conditionState,
+            conditionLabel: presentation.conditionLabel || "Good",
+            lifecycleState: presentation.lifecycleState,
+            lifecycleLabel: presentation.lifecycleLabel,
           };
         })(),
-        conditionState: normalizeComponentState({
-          conditionState: part.condition_state
-        }),
-        conditionLabel: COMPONENT_STATUS_LABELS[normalizeComponentState({
-          conditionState: part.condition_state
-        })] || "Good",
-        lifecycleState: normalizeLifecycleState({
-          lifecycleState: part.lifecycle_state
-        }),
-        lifecycleLabel: LIFECYCLE_LABELS[normalizeLifecycleState({
-          lifecycleState: part.lifecycle_state
-        })],
         arInstructions: partInstructions,
         issueTypeOptions,
         activeIssues: (issuesByPartId.get(part.id) || []).map((issue) => {
@@ -582,7 +555,7 @@ exports.getARSnapshot = async (id, user) => {
         ...(issueTypesByPartCode.get(partCode) || []),
         ...(partCode === "generic" ? [] : (issueTypesByPartCode.get("generic") || []))
       ].map((issueType) => mapIssueTypeOption(issueType, partInstructions));
-      const presentation = deriveComponentPresentation({
+      const presentation = buildComponentPresentationFields({
         conditionState: part.condition_state,
         lifecycleState: part.lifecycle_state,
         issues: issuesByPartId.get(part.id) || [],
@@ -600,18 +573,10 @@ exports.getARSnapshot = async (id, user) => {
         icon: part.icon_key || "Wrench",
         status: presentation.status,
         maintenanceIndicator: presentation.maintenanceIndicator,
-        conditionState: normalizeComponentState({
-          conditionState: part.condition_state
-        }),
-        conditionLabel: COMPONENT_STATUS_LABELS[normalizeComponentState({
-          conditionState: part.condition_state
-        })] || "Good",
-        lifecycleState: normalizeLifecycleState({
-          lifecycleState: part.lifecycle_state
-        }),
-        lifecycleLabel: LIFECYCLE_LABELS[normalizeLifecycleState({
-          lifecycleState: part.lifecycle_state
-        })],
+        conditionState: presentation.conditionState,
+        conditionLabel: presentation.conditionLabel || "Good",
+        lifecycleState: presentation.lifecycleState,
+        lifecycleLabel: presentation.lifecycleLabel,
         arInstructions: partInstructions,
         activeIssues: (issuesByPartId.get(part.id) || []).map((issue) => {
           const matchingIssueType = issueTypeOptions.find((issueType) => issueType.id === issue.issue_type_id)

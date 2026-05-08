@@ -8,8 +8,10 @@ const periodIntervals = {
   year: { trunc: "month", interval: "1 year", groupFormat: "Mon" },
 };
 
+const getPeriodConfig = (period = "week") => periodIntervals[period] || periodIntervals.week;
+
 exports.getSummaryStats = async (period = "week") => {
-  const interval = periodIntervals[period]?.interval || "6 days";
+  const { interval } = getPeriodConfig(period);
   const result = await db.query(
     `SELECT
       COUNT(*)::int AS created,
@@ -20,50 +22,54 @@ exports.getSummaryStats = async (period = "week") => {
           AND status <> 'resolved'
       )::int AS overdue
      FROM issues
-     WHERE created_at >= CURRENT_DATE - INTERVAL '${interval}'`
+     WHERE created_at >= CURRENT_DATE - $1::interval`,
+    [interval]
   );
   return result.rows[0];
 };
 
 exports.getCreatedCountsByPeriod = async (period = "week") => {
-  const { trunc, interval } = periodIntervals[period] || periodIntervals.week;
+  const { trunc, interval } = getPeriodConfig(period);
   const result = await db.query(
     `SELECT
-      date_trunc('${trunc}', created_at)::date AS period_start,
+      date_trunc($1, created_at)::date AS period_start,
       COUNT(*)::int AS total
      FROM issues
-     WHERE created_at >= CURRENT_DATE - INTERVAL '${interval}'
+     WHERE created_at >= CURRENT_DATE - $2::interval
      GROUP BY 1
-     ORDER BY 1 ASC`
+     ORDER BY 1 ASC`,
+    [trunc, interval]
   );
   return result.rows;
 };
 
 exports.getCompletedCountsByPeriod = async (period = "week") => {
-  const { trunc, interval } = periodIntervals[period] || periodIntervals.week;
+  const { trunc, interval } = getPeriodConfig(period);
   const result = await db.query(
     `SELECT
-      date_trunc('${trunc}', resolved_at)::date AS period_start,
+      date_trunc($1, resolved_at)::date AS period_start,
       COUNT(*)::int AS total
      FROM issues
      WHERE resolved_at IS NOT NULL
-       AND resolved_at >= CURRENT_DATE - INTERVAL '${interval}'
+       AND resolved_at >= CURRENT_DATE - $2::interval
      GROUP BY 1
-     ORDER BY 1 ASC`
+     ORDER BY 1 ASC`,
+    [trunc, interval]
   );
   return result.rows;
 };
 
 exports.getJobsByStatus = async (period = "week") => {
-  const interval = periodIntervals[period]?.interval || "6 days";
+  const { interval } = getPeriodConfig(period);
   const result = await db.query(
     `SELECT
       status,
       COUNT(*)::int AS total
      FROM issues
-     WHERE created_at >= CURRENT_DATE - INTERVAL '${interval}'
+     WHERE created_at >= CURRENT_DATE - $1::interval
      GROUP BY 1
-     ORDER BY 1 ASC`
+     ORDER BY 1 ASC`,
+    [interval]
   );
   return result.rows;
 };

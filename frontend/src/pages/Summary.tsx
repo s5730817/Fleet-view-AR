@@ -37,16 +37,17 @@ const Summary = () => {
   const canViewSummary =
     user?.role === "admin" || user?.role === "manager";
 
-  if (!canViewSummary) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   const [period, setPeriod] = useState<SummaryPeriod>("week");
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["summary", period],
     queryFn: () => getSummary(period),
+    enabled: canViewSummary,
   });
+
+  if (!canViewSummary) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   if (isLoading) {
     return (

@@ -1,4 +1,5 @@
 import fs from "fs";
+import type { ServerOptions as HttpsServerOptions } from "https";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -28,7 +29,7 @@ export default defineConfig(({ mode }) => {
 
   const certPair = certCandidates.find(({ key, cert }) => fs.existsSync(key) && fs.existsSync(cert));
 
-  const httpsOptions = useHttps
+  const httpsOptions: boolean | HttpsServerOptions = useHttps
     ? certPair
       ? { key: fs.readFileSync(certPair.key), cert: fs.readFileSync(certPair.cert) }
       : true
@@ -41,7 +42,7 @@ export default defineConfig(({ mode }) => {
       host: "0.0.0.0",
       port: 8080,
       strictPort: true,
-      https: httpsOptions as any,
+      https: httpsOptions,
       hmr: {
         protocol: useHttps ? "wss" : "ws",
         overlay: false,

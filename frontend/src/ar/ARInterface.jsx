@@ -5,7 +5,9 @@ import { addMaintenanceEntry, createFault, updateFaultStatus } from "@/lib/api";
 import { APP_STATES } from "./constants";
 import { useAREngine } from "./hooks/useAREngine";
 import { useARTracking } from "./hooks/useARTracking";
+import { buildTrackedDepotTools } from "./toolTrackingCatalog";
 import { TrackingView } from "./views/TrackingView";
+import { ToolTrackingView } from "./views/ToolTrackingView";
 
 /**
  * Root application component — thin orchestrator.
@@ -18,37 +20,50 @@ import { TrackingView } from "./views/TrackingView";
  *   appState          - which screen is visible
  *   showCapturedOnly  - tracking filter toggle
  */
-export default function ARInterface({ arContext, onExit, onIssueCreated }) {
+export default function ARInterface({ arContext, onExit, onIssueCreated, mode = "maintenance" }) {
   const [showDetectedOnly, setShowDetectedOnly] = useState(false);
 
   const { hasPermission, role } = usePermission();
   const { toast } = useToast();
   const { arReady, arError } = useAREngine();
+  const trackedDepotTools = useMemo(
+    () => buildTrackedDepotTools(arContext.tools, arContext.bus?.depotName),
+    [arContext.tools, arContext.bus?.depotName],
+  );
   const markers = useMemo(
-    () => [
-      ...arContext.parts.map((part) => ({
-        barcodeValue: part.markerCode,
-        name: part.name,
-        status: part.status,
-        description: `${part.conditionLabel} · ${part.lifecycleLabel}`,
-        issuePoints: part.activeIssues,
-        markerType: "part",
-      })),
-      ...arContext.tools.map((tool) => ({
+    () => {
+      const toolMarkers = trackedDepotTools.map((tool) => ({
         barcodeValue: tool.markerCode,
         name: tool.name,
         status: tool.status,
         description: `${tool.depotName} · ${tool.status}`,
         issuePoints: [],
         markerType: "tool",
-      })),
-    ],
-    [arContext.parts, arContext.tools],
+      }));
+
+      if (mode === "tool-tracker") {
+        return toolMarkers;
+      }
+
+      return [
+        ...arContext.parts.map((part) => ({
+          barcodeValue: part.markerCode,
+          name: part.name,
+          status: part.status,
+          description: `${part.conditionLabel} · ${part.lifecycleLabel}`,
+          issuePoints: part.activeIssues,
+          markerType: "part",
+        })),
+        ...toolMarkers,
+      ];
+    },
+    [arContext.parts, trackedDepotTools, mode],
   );
   const tracking = useARTracking({
     appState: APP_STATES.TRACKING,
     arReady,
     markers,
+    mode,
     showCapturedOnly: showDetectedOnly,
   });
   const canCreate = hasPermission("create");
@@ -56,6 +71,20 @@ export default function ARInterface({ arContext, onExit, onIssueCreated }) {
     () => arContext.parts.find((part) => part.markerCode === tracking.centeredMarker?.id) || null,
     [arContext.parts, tracking.centeredMarker],
   );
+
+  if (mode === "tool-tracker") {
+    return (
+      <ToolTrackingView
+        arContainerRef={tracking.arContainerRef}
+        bus={arContext.bus}
+        tools={trackedDepotTools}
+        trackingMessage={tracking.trackingMessage}
+        detectedMarkers={tracking.detectedMarkers}
+        arError={tracking.cameraError || arError}
+        onExit={onExit}
+      />
+    );
+  }
 
   const getStoredUser = () => {
     try {

@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { AccessibilityToggle } from "@/components/AccessibilityToggle";
 import {
   DropdownMenu,
@@ -8,13 +9,17 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Menu, User } from "lucide-react";
+import { usePermission } from "@/context/PermissionContext";
 import { useSyncStatus } from "@/context/SyncStatusContext";
 import { clearOfflineSession } from "@/lib/offline";
+import { getNotifications, type AppNotification } from "@/lib/api";
 
 const USER_CHANGED_EVENT = "transitlens:user-changed";
 
 export function Navbar() {
   const navigate = useNavigate();
+  const token = window.localStorage.getItem("token");
+  const { role } = usePermission();
 
   const {
     isOnline,
@@ -33,6 +38,20 @@ export function Navbar() {
 
   const canViewSummary =
     user?.role === "admin" || user?.role === "manager";
+  const canViewToolTracker = role === "manager";
+
+  const { data: notifications = [] } = useQuery<AppNotification[]>({
+    queryKey: ["notifications"],
+    queryFn: getNotifications,
+    enabled: Boolean(token),
+    refetchInterval: 30000,
+    staleTime: 10000,
+    retry: false,
+  });
+
+  const hasUnreadNotifications = notifications.some(
+    (notification) => notification.unread
+  );
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -48,6 +67,20 @@ export function Navbar() {
         ? "bg-primary text-primary-foreground"
         : "text-muted-foreground hover:bg-muted hover:text-foreground"
     }`;
+
+  const renderNotificationLabel = () => (
+    <span className="inline-flex items-center gap-2">
+      <span>Notifications</span>
+      {hasUnreadNotifications ? (
+        <span className="h-2.5 w-2.5 rounded-full bg-status-urgent" />
+      ) : null}
+    </span>
+  );
+
+  const renderNotificationDot = () =>
+    hasUnreadNotifications ? (
+      <span className="h-2.5 w-2.5 rounded-full bg-status-urgent" />
+    ) : null;
 
   const offlineStatusLabel = (() => {
     if (!isOnline) {
@@ -113,7 +146,7 @@ export function Navbar() {
           </NavLink>
 
           <NavLink to="/notifications" className={linkClass}>
-            Notifications
+            {renderNotificationLabel()}
           </NavLink>
 
           {canViewSummary && (
@@ -122,9 +155,11 @@ export function Navbar() {
             </NavLink>
           )}
 
-          <NavLink to="/tool-tracker" className={linkClass}>
-            Tool Tracker
-          </NavLink>
+          {canViewToolTracker && (
+            <NavLink to="/tool-tracker" className={linkClass}>
+              Tool Tracker
+            </NavLink>
+          )}
 
           <NavLink to="/maintenance-reports" className={linkClass}>
             Maintenance Reports
@@ -198,7 +233,10 @@ export function Navbar() {
               </DropdownMenuItem>
 
               <DropdownMenuItem onClick={() => navigate("/notifications")}>
-                Notifications
+                <div className="flex w-full items-center justify-between gap-3">
+                  <span>Notifications</span>
+                  {renderNotificationDot()}
+                </div>
               </DropdownMenuItem>
 
               {canViewSummary && (
@@ -207,9 +245,11 @@ export function Navbar() {
                 </DropdownMenuItem>
               )}
 
-              <DropdownMenuItem onClick={() => navigate("/tool-tracker")}>
-                Tool Tracker
-              </DropdownMenuItem>
+              {canViewToolTracker && (
+                <DropdownMenuItem onClick={() => navigate("/tool-tracker")}>
+                  Tool Tracker
+                </DropdownMenuItem>
+              )}
 
               <DropdownMenuItem
                 onClick={() => navigate("/maintenance-reports")}

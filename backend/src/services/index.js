@@ -22,11 +22,21 @@ const summaryService = dataSource === "postgres"
   ? require("./summary.service.real")
   : require("./summary.service");
 
+const teamService = dataSource === "postgres"
+  ? require("./team.service.real")
+  : require("./team.service");
+
+const notificationService = dataSource === "postgres"
+  ? require("./notification.service.real")
+  : require("./notification.service");
+
 module.exports = {
   dataSource,
   authService,
   faultService,
   fleetService,
   jobService,
-  summaryService
+  summaryService,
+  teamService,
+  notificationService
 };

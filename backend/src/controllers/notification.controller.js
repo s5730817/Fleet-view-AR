@@ -1,4 +1,4 @@
-const notificationService = require("../services/notification.service");
+const { notificationService } = require("../services");
 
 exports.getNotifications = async (req, res) => {
   try {
@@ -20,7 +20,7 @@ exports.getNotifications = async (req, res) => {
 
 exports.markOneAsRead = async (req, res) => {
   try {
-    await notificationService.markOneAsRead(req.params.id);
+    await notificationService.markOneAsRead(req.params.id, req.user);
 
     res.status(200).json({
       success: true,

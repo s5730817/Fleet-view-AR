@@ -3,7 +3,7 @@ import {
   applyOptimisticARContextOperations,
   applyOptimisticBusOperations,
   applyOptimisticFleetOperations,
-} from "@/lib/offline-optimistic";
+} from "./offline-optimistic";
 import type { Bus, BusARContext } from "@/types/fleet";
 import type { OfflineOperation } from "@/lib/offline-store";
 

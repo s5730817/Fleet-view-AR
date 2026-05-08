@@ -4,6 +4,51 @@
 const request = require("supertest");
 const app = require("../src/app");
 
+const getTwoFactorCode = (logSpy, email) => {
+  const marker = `2FA code for ${email}: `;
+  const message = [...logSpy.mock.calls]
+    .map(([entry]) => (typeof entry === "string" ? entry : ""))
+    .reverse()
+    .find((entry) => entry.includes(marker));
+
+  return message?.slice(message.lastIndexOf(":") + 1).trim();
+};
+
+const authenticateUser = async ({ email, password }) => {
+  const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+
+  try {
+    const loginRes = await request(app)
+      .post("/api/auth/login")
+      .send({ email, password });
+
+    expect(loginRes.statusCode).toBe(200);
+    expect(loginRes.body.success).toBe(true);
+    expect(loginRes.body.data.requires2FA).toBe(true);
+    expect(loginRes.body.data.email).toBe(email);
+
+    const code = getTwoFactorCode(logSpy, email);
+
+    expect(code).toBeDefined();
+
+    const verifyRes = await request(app)
+      .post("/api/auth/verify-2fa")
+      .send({ email, code });
+
+    expect(verifyRes.statusCode).toBe(200);
+    expect(verifyRes.body.success).toBe(true);
+
+    return {
+      loginRes,
+      verifyRes,
+      token: verifyRes.body.data.token,
+      user: verifyRes.body.data.user,
+    };
+  } finally {
+    logSpy.mockRestore();
+  }
+};
+
 describe("Auth API", () => {
   const testUser = {
     name: "Aisha Khan",
@@ -24,18 +69,24 @@ describe("Auth API", () => {
     expect(res.body.data.role).toBe(testUser.role);
   });
 
-  test("POST /api/auth/login should log in a registered user", async () => {
-    const res = await request(app)
-      .post("/api/auth/login")
-      .send({
-        email: testUser.email,
-        password: testUser.password
-      });
+  test("POST /api/auth/login should start a 2FA challenge for a registered user", async () => {
+    const { loginRes } = await authenticateUser({
+      email: testUser.email,
+      password: testUser.password,
+    });
 
-    expect(res.statusCode).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(res.body.data.token).toBeDefined();
-    expect(res.body.data.user.email).toBe(testUser.email);
+    expect(loginRes.body.data.requires2FA).toBe(true);
+    expect(loginRes.body.data.email).toBe(testUser.email);
+  });
+
+  test("POST /api/auth/verify-2fa should issue a token after a valid code", async () => {
+    const { token, user } = await authenticateUser({
+      email: testUser.email,
+      password: testUser.password,
+    });
+
+    expect(token).toBeDefined();
+    expect(user.email).toBe(testUser.email);
   });
 
   test("POST /api/auth/login should fail with wrong password", async () => {
@@ -70,18 +121,15 @@ describe("Fault API", () => {
         role: "manager"
       });
 
-    const loginRes = await request(app)
-      .post("/api/auth/login")
-      .send({
-        email,
-        password
-      });
+    const authSession = await authenticateUser({ email, password });
 
-    authToken = loginRes.body.data.token;
+    authToken = authSession.token;
   });
 
   test("GET /api/faults/summary should return summary data", async () => {
-    const res = await request(app).get("/api/faults/summary");
+    const res = await request(app)
+      .get("/api/faults/summary")
+      .set("Authorization", `Bearer ${authToken}`);
 
     expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
@@ -92,7 +140,9 @@ describe("Fault API", () => {
   });
 
   test("GET /api/faults should return all faults", async () => {
-    const res = await request(app).get("/api/faults");
+    const res = await request(app)
+      .get("/api/faults")
+      .set("Authorization", `Bearer ${authToken}`);
 
     expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
@@ -129,7 +179,9 @@ describe("Fault API", () => {
   });
 
   test("GET /api/faults?status=reported should filter faults by status", async () => {
-    const res = await request(app).get("/api/faults?status=reported");
+    const res = await request(app)
+      .get("/api/faults?status=reported")
+      .set("Authorization", `Bearer ${authToken}`);
 
     expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
@@ -140,7 +192,9 @@ describe("Fault API", () => {
   });
 
   test("GET /api/faults?status=banana should fail with invalid filter", async () => {
-    const res = await request(app).get("/api/faults?status=banana");
+    const res = await request(app)
+      .get("/api/faults?status=banana")
+      .set("Authorization", `Bearer ${authToken}`);
 
     expect(res.statusCode).toBe(400);
     expect(res.body.success).toBe(false);
@@ -148,7 +202,9 @@ describe("Fault API", () => {
   });
 
   test("GET /api/faults/1 should return one fault", async () => {
-    const res = await request(app).get("/api/faults/1");
+    const res = await request(app)
+      .get("/api/faults/1")
+      .set("Authorization", `Bearer ${authToken}`);
 
     expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
@@ -156,7 +212,9 @@ describe("Fault API", () => {
   });
 
   test("GET /api/faults/999 should return 404 for missing fault", async () => {
-    const res = await request(app).get("/api/faults/999");
+    const res = await request(app)
+      .get("/api/faults/999")
+      .set("Authorization", `Bearer ${authToken}`);
 
     expect(res.statusCode).toBe(404);
     expect(res.body.success).toBe(false);
@@ -166,6 +224,7 @@ describe("Fault API", () => {
   test("POST /api/faults should create a new fault", async () => {
     const res = await request(app)
       .post("/api/faults")
+      .set("Authorization", `Bearer ${authToken}`)
       .send({
         title: "Loose overhead cable",
         description: "Cable appears detached near tunnel entrance.",
@@ -186,6 +245,7 @@ describe("Fault API", () => {
   test("PATCH /api/faults/:id/status should update fault status", async () => {
     const res = await request(app)
       .patch(`/api/faults/${createdFaultId}/status`)
+      .set("Authorization", `Bearer ${authToken}`)
       .send({
         status: "awaiting_approval"
       });
@@ -196,7 +256,9 @@ describe("Fault API", () => {
   });
 
   test("GET /api/faults/:id/updates should return updates for a fault", async () => {
-    const res = await request(app).get(`/api/faults/${createdFaultId}/updates`);
+    const res = await request(app)
+      .get(`/api/faults/${createdFaultId}/updates`)
+      .set("Authorization", `Bearer ${authToken}`);
 
     expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
@@ -206,6 +268,7 @@ describe("Fault API", () => {
   test("POST /api/faults/:id/updates should add a new update", async () => {
     const res = await request(app)
       .post(`/api/faults/${createdFaultId}/updates`)
+      .set("Authorization", `Bearer ${authToken}`)
       .send({
         created_by: "engineer_3",
         update_type: "comment",
@@ -220,6 +283,7 @@ describe("Fault API", () => {
   test("POST /api/faults/:id/updates should capture sign-off notes and status change", async () => {
     const res = await request(app)
       .post(`/api/faults/${createdFaultId}/updates`)
+      .set("Authorization", `Bearer ${authToken}`)
       .send({
         created_by: "engineer_4",
         update_type: "sign_off",

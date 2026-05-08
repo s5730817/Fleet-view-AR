@@ -1,7 +1,5 @@
 // This file contains temporary mock auth logic until the database is ready.
 
-console.log("MOCK auth.service.js loaded");
-
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { randomUUID } = require("crypto");

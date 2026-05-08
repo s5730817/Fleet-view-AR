@@ -19,9 +19,13 @@ describe("Data source integration", () => {
   test("defaults to mock mode when postgres is not configured", () => {
     const services = require("../src/services");
     const mockAuthService = require("../src/services/auth.service");
+    const mockTeamService = require("../src/services/team.service");
+    const mockNotificationService = require("../src/services/notification.service");
 
     expect(services.dataSource).toBe("mock");
     expect(services.authService.registerUser).toBe(mockAuthService.registerUser);
+    expect(services.teamService.getTeamMembers).toBe(mockTeamService.getTeamMembers);
+    expect(services.notificationService.getNotifications).toBe(mockNotificationService.getNotifications);
   });
 
   test("loads postgres service graph when postgres mode is requested", () => {
@@ -31,8 +35,12 @@ describe("Data source integration", () => {
 
     const services = require("../src/services");
     const realAuthService = require("../src/services/auth.service.real");
+    const realTeamService = require("../src/services/team.service.real");
+    const realNotificationService = require("../src/services/notification.service.real");
 
     expect(services.dataSource).toBe("postgres");
     expect(services.authService.registerUser).toBe(realAuthService.registerUser);
+    expect(services.teamService.getTeamMembers).toBe(realTeamService.getTeamMembers);
+    expect(services.notificationService.getNotifications).toBe(realNotificationService.getNotifications);
   });
 });

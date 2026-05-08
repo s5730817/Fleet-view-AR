@@ -60,7 +60,7 @@ const getStoredUserRole = () => {
 
 const AppRoutes = () => {
   const location = useLocation();
-  const hideNavbar = location.pathname === "/";
+  const hideNavbar = location.pathname === "/" || location.pathname === "/tool-tracker";
 
   return (
     <>

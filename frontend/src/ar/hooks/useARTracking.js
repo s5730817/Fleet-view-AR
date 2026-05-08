@@ -47,15 +47,6 @@ const ensureCameraAccess = async () => {
     mediaError.name = "SecurityError";
     throw mediaError;
   }
-
-  const testStream = await navigator.mediaDevices.getUserMedia({
-    video: {
-      facingMode: { ideal: "environment" },
-    },
-    audio: false,
-  });
-
-  testStream.getTracks().forEach((track) => track.stop());
 };
 
 /**
@@ -69,10 +60,10 @@ const ensureCameraAccess = async () => {
  * Labels render a large status circle over the marker, while the part
  * name is rendered in the UI above the aim helper.
  */
-export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) => {
+export const useARTracking = ({ appState, arReady, markers, showCapturedOnly, mode = "maintenance" }) => {
   const arContainerRef = useRef(null);
   const arStateRef = useRef({});
-  // Map<id, { markerRoot, stableRoot, missCount, firstVisible, statusSprite, statusColor }>
+  // Map<id, { markerRoot, stableRoot, missCount, firstVisible, statusSprite, spriteKey }>
   const markerEntriesRef = useRef(new Map());
 
   const [trackingMessage, setTrackingMessage] = useState("Point the camera at one or more markers.");
@@ -314,6 +305,45 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
         return sprite;
       };
 
+      const createToolLabelSprite = (label, accentColor) => {
+        const text = String(label || "Tool").trim();
+        const labelCanvas = document.createElement("canvas");
+        labelCanvas.width = 448;
+        labelCanvas.height = 160;
+        const ctx = labelCanvas.getContext("2d");
+        if (!ctx) return null;
+
+        ctx.clearRect(0, 0, labelCanvas.width, labelCanvas.height);
+        drawRoundedRect(ctx, 28, 26, 392, 92, 30);
+        ctx.fillStyle = "rgba(5, 7, 11, 0.86)";
+        ctx.fill();
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = accentColor;
+        ctx.stroke();
+
+        ctx.font = "700 32px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "rgba(255,255,255,0.98)";
+        ctx.fillText(text, labelCanvas.width / 2, 72, 332);
+
+        const texture = new THREE.CanvasTexture(labelCanvas);
+        texture.needsUpdate = true;
+        texture.minFilter = THREE.LinearFilter;
+        const material = new THREE.SpriteMaterial({
+          map: texture,
+          transparent: true,
+          depthTest: false,
+          depthWrite: false,
+          sizeAttenuation: false,
+        });
+        const sprite = new THREE.Sprite(material);
+        sprite.scale.set(0.26, 0.094, 1);
+        sprite.position.set(0, 0.06, 0);
+        sprite.renderOrder = 90;
+        return sprite;
+      };
+
       const disposeSprite = (root, sprite) => {
         if (!sprite) return;
         if (sprite.material?.map) sprite.material.map.dispose();
@@ -321,8 +351,13 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
         root.remove(sprite);
       };
 
-      const updateMarkerSprites = (entry, accentColor) => {
-        if (entry.statusColor === accentColor && entry.statusSprite) {
+      const updateMarkerSprites = (entry, matchedMarker, accentColor) => {
+        const useToolLabel = mode === "tool-tracker" && matchedMarker?.markerType === "tool";
+        const nextSpriteKey = useToolLabel
+          ? `tool-label:${matchedMarker?.name || ""}:${accentColor}`
+          : `status:${accentColor}`;
+
+        if (entry.spriteKey === nextSpriteKey && entry.statusSprite) {
           return;
         }
 
@@ -331,12 +366,14 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
           entry.statusSprite = null;
         }
 
-        const statusSprite = createStatusSprite(accentColor);
+        const statusSprite = useToolLabel
+          ? createToolLabelSprite(matchedMarker?.name, accentColor)
+          : createStatusSprite(accentColor);
         if (!statusSprite) return;
 
         entry.stableRoot.add(statusSprite);
         entry.statusSprite = statusSprite;
-        entry.statusColor = accentColor;
+        entry.spriteKey = nextSpriteKey;
       };
 
       /**
@@ -366,7 +403,7 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
           missCount: 0,
           firstVisible: true,
           statusSprite: null,
-          statusColor: "",
+          spriteKey: "",
         });
       };
 
@@ -440,7 +477,7 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
           }
 
           const accentColor = getMarkerAccentColor(matchedMarker, assigned);
-          updateMarkerSprites(entry, accentColor);
+          updateMarkerSprites(entry, matchedMarker, accentColor);
           projectedPosition.setFromMatrixPosition(stableRoot.matrixWorld).project(camera);
           const screenX = ((projectedPosition.x + 1) / 2) * viewportWidth;
           const screenY = ((1 - projectedPosition.y) / 2) * viewportHeight;
@@ -496,7 +533,7 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly }) 
       active = false;
       clearARScene();
     };
-  }, [appState, arReady, markers, showCapturedOnly]);
+  }, [appState, arReady, markers, mode, showCapturedOnly]);
 
   return {
     arContainerRef,

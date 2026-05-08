@@ -71,6 +71,12 @@ const BusDetail = () => {
   const [serverDecisionActionId, setServerDecisionActionId] = useState<string | null>(null);
   const [modalArContext, setModalArContext] = useState<ARBusPart[] | null>(null);
 
+  useEffect(() => {
+    if (arContext) {
+      setModalArContext(arContext.parts);
+    }
+  }, [arContext]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -125,12 +131,6 @@ const BusDetail = () => {
     void refetch();
     void refetchArContext();
   };
-
-  useEffect(() => {
-    if (arContext) {
-      setModalArContext(arContext.parts);
-    }
-  }, [arContext]);
 
   const loadArContextForModals = async () => {
     if (!id) {

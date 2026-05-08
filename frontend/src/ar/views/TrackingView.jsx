@@ -157,6 +157,7 @@ export function TrackingView({
   const choosePartLabel = aimedPart
     ? `Choose ${aimedPart.name}`
     : "Point the aim helper at a part marker";
+  const managerActionLabel = aimedPart ? "Report Issue" : "Point the aim helper at a part marker";
 
   const getPriorityClass = (priority) => {
     switch (priority) {
@@ -359,7 +360,7 @@ export function TrackingView({
     <div className="relative min-h-screen bg-black text-white">
       <div ref={arContainerRef} className="fixed inset-0 z-[1000] h-screen w-screen overflow-hidden bg-black" />
 
-      {isEngineerView && (
+      {!repairWorkflow && (
         <div
           className="pointer-events-none fixed left-1/2 top-1/2 z-[1001] -translate-x-1/2 -translate-y-1/2 rounded-[24px] border-2 border-white/80"
           style={{
@@ -396,7 +397,7 @@ export function TrackingView({
             </div>
           )}
 
-          {isEngineerView && !repairWorkflow && (
+          {!repairWorkflow && (
             <div className="w-full rounded-xl border border-white/10 bg-black/65 px-3 py-2 text-xs text-white/85 md:hidden">
               {aimedPart
                 ? `${aimedPart.name} in aim${aimedPartFixableIssues.length > 0 ? ` · ${aimedPartFixableIssues.length} active issue${aimedPartFixableIssues.length === 1 ? "" : "s"}` : canApproveSelectedPart ? ` · ${aimedPart.maintenanceIndicator.label}` : " · ready for action"}`
@@ -408,7 +409,7 @@ export function TrackingView({
         </div>
       </div>
 
-      {isEngineerView && !repairWorkflow && (
+      {!repairWorkflow && (
         <div className="pointer-events-none fixed right-4 top-24 z-[1003] hidden w-[min(360px,calc(100vw-2rem))] rounded-2xl border border-white/15 bg-black/82 p-4 shadow-2xl backdrop-blur md:block">
           <div className="pointer-events-auto space-y-3">
             {aimedPart ? (
@@ -427,8 +428,12 @@ export function TrackingView({
                   {aimedPartFixableIssues.length > 0
                     ? `${aimedPartFixableIssues.length} active issue${aimedPartFixableIssues.length === 1 ? "" : "s"} available for guided repair.`
                     : canApproveSelectedPart
-                      ? `No active issues. ${aimedPart.maintenanceIndicator.label} can be approved from the action menu.`
-                      : "No active issues yet. Log a new issue from the action menu."}
+                      ? isEngineerView
+                        ? `No active issues. ${aimedPart.maintenanceIndicator.label} can be approved from the action menu.`
+                        : `No active issues. ${aimedPart.maintenanceIndicator.label} is due on this part.`
+                      : isEngineerView
+                        ? "No active issues yet. Log a new issue from the action menu."
+                        : "No active issues yet. Use the report action to log one for this part."}
                 </div>
               </div>
             ) : (
@@ -545,11 +550,11 @@ export function TrackingView({
           {isManagerView && (
             <button
               type="button"
-              onClick={() => openIssuePopup(detectedPartMarkers[0]?.id)}
-              disabled={detectedPartMarkers.length === 0}
-              className="pointer-events-auto ml-auto rounded-full bg-primary px-6 py-4 text-sm font-semibold text-primary-foreground shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => openIssuePopup(aimedPart?.id)}
+              disabled={!aimedPart}
+              className="pointer-events-auto ml-auto rounded-full bg-primary px-6 py-4 text-sm font-semibold uppercase tracking-wide text-primary-foreground shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {detectedPartMarkers.length > 0 ? "Report Issue" : reportButtonLabel}
+              {managerActionLabel}
             </button>
           )}
 

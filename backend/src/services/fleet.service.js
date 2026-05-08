@@ -9,14 +9,10 @@ const {
   getIssueTypeOptionsForPart
 } = require("../utils/arIssueCatalog");
 const {
-  COMPONENT_INDICATOR_LABELS,
-  COMPONENT_STATUS_LABELS,
-  deriveComponentPresentation,
-  deriveBusMaintenanceSummary,
-  LIFECYCLE_LABELS,
-  normalizeComponentState,
-  normalizeLifecycleState
-} = require("../utils/maintenanceStatus");
+  buildComponentPresentationFields,
+  buildBusMaintenanceFields,
+  buildBusMaintenanceStatus
+} = require("./fleetPresentation.shared");
 const {
   getRelativeDemoDate,
   shiftDemoDate
@@ -80,16 +76,10 @@ const shiftHistoryEntry = (entry) => ({
 });
 
 const normalizeMockComponent = (component) => {
-  const conditionState = normalizeComponentState({
-    conditionState: component.conditionState || legacyConditionStateMap[component.status] || "good"
-  });
-  const lifecycleState = normalizeLifecycleState({
-    lifecycleState: component.lifecycleState || legacyLifecycleStateMap[component.status] || "within_expected_life"
-  });
   const lastInspected = shiftDemoDate(component.lastService);
-  const presentation = deriveComponentPresentation({
-    conditionState,
-    lifecycleState,
+  const presentation = buildComponentPresentationFields({
+    conditionState: component.conditionState || legacyConditionStateMap[component.status] || "good",
+    lifecycleState: component.lifecycleState || legacyLifecycleStateMap[component.status] || "within_expected_life",
     issues: [],
     lastInspectedAt: lastInspected,
     inspectionIntervalDays: null
@@ -97,16 +87,7 @@ const normalizeMockComponent = (component) => {
 
   return {
     ...component,
-    status: presentation.status,
-    statusState: presentation.statusState,
-    statusNote: presentation.statusNote,
-    conditionState,
-    conditionLabel: COMPONENT_STATUS_LABELS[conditionState] || COMPONENT_INDICATOR_LABELS[conditionState],
-    lifecycleState,
-    lifecycleLabel: LIFECYCLE_LABELS[lifecycleState],
-    maintenanceIndicator: presentation.maintenanceIndicator,
-    activeIssueCount: 0,
-    inProgressIssueCount: 0,
+    ...presentation,
     lastInspected
   };
 };
@@ -174,7 +155,7 @@ const augmentHistoryWithIssues = async (buses) => {
 
           return {
             ...component,
-            ...deriveComponentPresentation({
+            ...buildComponentPresentationFields({
               conditionState: component.conditionState,
               lifecycleState: component.lifecycleState,
               issues: faults.filter((fault) => fault.bus_part_id === component.id),
@@ -188,7 +169,7 @@ const augmentHistoryWithIssues = async (buses) => {
         })
       );
 
-      const maintenanceSummary = deriveBusMaintenanceSummary({
+      const maintenanceSummary = buildBusMaintenanceFields({
         nextServiceAt: bus.nextServiceDate,
         issues: buildMockIssueSummaryInput({ ...bus, components }),
         components
@@ -722,7 +703,7 @@ exports.getARContext = async (id) => {
       plateNumber: bus.plateNumber,
       depotId: `mock-depot-${depotSequence}`,
       depotName,
-      status: deriveBusMaintenanceSummary({
+      status: buildBusMaintenanceStatus({
         nextServiceAt: shiftDemoDate(bus.nextServiceDate),
         issues: buildMockIssueSummaryInput(bus),
         components: bus.components.map((component) => ({
@@ -816,7 +797,7 @@ exports.getARSnapshot = async (id) => {
       plateNumber: bus.plateNumber,
       depotId: `mock-depot-${depotSequence}`,
       depotName,
-      status: deriveBusMaintenanceSummary({
+      status: buildBusMaintenanceStatus({
         nextServiceAt: shiftDemoDate(bus.nextServiceDate),
         issues: buildMockIssueSummaryInput(bus),
         components: bus.components.map((component) => ({

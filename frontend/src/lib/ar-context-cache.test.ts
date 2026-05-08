@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { composeBusARContext } from "@/lib/ar-context-cache";
+import { composeBusARContext } from "./ar-context-cache";
 import type { ARCatalog, BusARSnapshot } from "@/types/fleet";
 
 const snapshot: BusARSnapshot = {
