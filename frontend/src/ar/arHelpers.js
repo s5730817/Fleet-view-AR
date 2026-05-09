@@ -41,6 +41,30 @@ export const computeScreenPosition = (position, camera, width, height) => {
   };
 };
 
+export const computeMarkerScreenFootprint = (markerRoot, camera, width, height, markerSize = 1) => {
+  const halfSize = markerSize / 2;
+  const centerPoint = markerRoot.localToWorld(new THREE.Vector3(0, 0, 0));
+  const center = computeScreenPosition(centerPoint, camera, width, height);
+
+  const corners = [
+    new THREE.Vector3(-halfSize, 0, -halfSize),
+    new THREE.Vector3(halfSize, 0, -halfSize),
+    new THREE.Vector3(halfSize, 0, halfSize),
+    new THREE.Vector3(-halfSize, 0, halfSize),
+  ].map((corner) => computeScreenPosition(markerRoot.localToWorld(corner), camera, width, height));
+
+  const radius = corners.reduce((largest, corner) => {
+    const distance = Math.hypot(corner.screenX - center.screenX, corner.screenY - center.screenY);
+    return Math.max(largest, distance);
+  }, 0);
+
+  return {
+    ...center,
+    radius: clamp(radius, 12, Math.min(width, height) * 0.24),
+    cornersOnScreen: corners.filter((corner) => corner.onScreen).length,
+  };
+};
+
 /** Clamp screen-pixel coordinates to the viewport with an optional edge padding. */
 export const clampScreenPosition = (x, y, width, height, padding = 28) => ({
   x: clamp(x, padding, width - padding),

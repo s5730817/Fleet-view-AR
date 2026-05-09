@@ -28,7 +28,7 @@ export function CaptureView({
       <div ref={arContainerRef} className="fixed inset-0 z-[1000] h-screen w-screen overflow-hidden bg-black" />
 
       <div className="pointer-events-none fixed inset-x-0 top-0 z-[1002] bg-gradient-to-b from-black/70 to-transparent p-4">
-        <div className="pointer-events-auto mx-auto flex max-w-5xl flex-wrap items-center gap-2 rounded-xl border border-white/20 bg-black/55 p-3 backdrop-blur">
+        <div className="pointer-events-auto ar-glass-soft mx-auto flex max-w-5xl flex-wrap items-center gap-2 rounded-xl border border-white/20 p-3 backdrop-blur">
           <button
             type="button"
             onClick={onBack}
@@ -65,7 +65,7 @@ export function CaptureView({
         style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
       >
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="pointer-events-auto rounded-xl border border-white/20 bg-black/60 p-4 text-sm backdrop-blur sm:w-[min(460px,calc(100%-2rem))]">
+          <div className="pointer-events-auto ar-glass-soft rounded-xl border border-white/20 p-4 text-sm backdrop-blur sm:w-[min(460px,calc(100%-2rem))]">
             <p className="font-bold">Capture Status</p>
             {!videoReady && !cameraError && <p className="mt-1 text-white/80">Starting camera...</p>}
             {videoReady && !targetMarker && <p className="mt-1 font-semibold text-amber-300">No marker in target box</p>}
@@ -92,7 +92,7 @@ export function CaptureView({
             type="button"
             onClick={onCapture}
             disabled={!videoReady || barcodeDetectionPending || !targetMarker}
-            className="pointer-events-auto w-full rounded-full border border-white/35 bg-black/70 px-5 py-3 text-sm font-semibold text-white backdrop-blur disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            className="pointer-events-auto ar-glass w-full rounded-full border border-white/35 px-5 py-3 text-sm font-semibold text-white backdrop-blur disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             Capture Marker
           </button>
@@ -110,7 +110,7 @@ export function CaptureView({
       )}
 
       {barcodeDebugInfo?.length > 0 && (
-        <div className="fixed bottom-28 right-4 z-[1003] w-[min(460px,calc(100vw-2rem))] max-h-[40vh] overflow-auto rounded-xl border border-white/20 bg-black/75 p-4 text-xs text-white backdrop-blur">
+        <div className="fixed bottom-28 right-4 z-[1003] ar-glass w-[min(460px,calc(100vw-2rem))] max-h-[40vh] overflow-auto rounded-xl border border-white/20 p-4 text-xs text-white backdrop-blur">
           <p className="font-bold">Barcode decode debug ({lastDecodeSource || "unknown"})</p>
           <div className="mt-3 grid gap-3">
             {barcodeDebugInfo.map((entry) => (
@@ -133,7 +133,7 @@ export function CaptureView({
 
       {markerPreviewUrl && (
         <div className="fixed inset-0 z-[1005] overflow-y-auto bg-black/70 p-4">
-          <div className="mx-auto mt-4 w-full max-w-2xl rounded-xl border border-white/15 bg-black/85 p-4 text-white shadow-xl backdrop-blur sm:mt-10">
+          <div className="ar-glass-strong mx-auto mt-4 w-full max-w-2xl rounded-xl border border-white/15 p-4 text-white shadow-xl backdrop-blur sm:mt-10">
             <h3 className="text-lg font-bold">Captured Frame</h3>
 
             <img src={markerPreviewUrl} alt="Captured marker" className="mt-3 w-full rounded-xl border border-white/10 object-cover" />

@@ -113,4 +113,19 @@
   .font-mono {
     font-family: var(--font-mono);
   }
+
+  .ar-glass-soft {
+    background-color: rgba(15, 23, 42, 0.58);
+    box-shadow: 0 18px 40px rgba(2, 6, 23, 0.18);
+  }
+
+  .ar-glass {
+    background-color: rgba(15, 23, 42, 0.72);
+    box-shadow: 0 18px 40px rgba(2, 6, 23, 0.22);
+  }
+
+  .ar-glass-strong {
+    background-color: rgba(2, 6, 23, 0.84);
+    box-shadow: 0 22px 48px rgba(2, 6, 23, 0.28);
+  }
 }
