@@ -597,6 +597,729 @@ const showcaseBusScenarios = [
         lifecycleState: "beyond_life_approved"
       }
     }
+  },
+  {
+    seed: "showcase:issue-catalog",
+    registrationNumber: "DMO-107",
+    name: "Showcase Issue Catalog",
+    depotSeed: "depot:central",
+    model: "Alexander Dennis Enviro 400 MMC",
+    year: 2022,
+    mileage: 89400,
+    lastServiceOffset: -22,
+    nextServiceOffset: 8,
+    partOverrides: {
+      engine: {
+        conditionState: "repair_needed",
+        issues: [
+          {
+            seed: "catalog-engine-overheat",
+            issueKey: "overheat",
+            title: "Engine overheating under load",
+            status: "reported",
+            priority: "high",
+            assignedToEmail: "tech1@test.com",
+            createdByEmail: "manager@test.com",
+            createdOffset: -1,
+            dueOffset: 3,
+            description: "Temperature gauge repeatedly spiking on the A7 route.",
+            updates: [
+              {
+                seed: "catalog-engine-overheat-comment",
+                type: "comment",
+                createdByEmail: "manager@test.com",
+                dateOffset: -1,
+                description: "Driver flagged repeated thermal cutback on return journey."
+              }
+            ]
+          }
+        ]
+      },
+      brakes: {
+        conditionState: "repair_needed",
+        issues: [
+          {
+            seed: "catalog-brakes-sensor",
+            issueKey: "sensor-fault",
+            title: "ABS sensor dropout on front axle",
+            status: "in_progress",
+            priority: "medium",
+            assignedToEmail: "tech1@test.com",
+            createdByEmail: "manager@test.com",
+            createdOffset: -3,
+            dueOffset: 2,
+            description: "ABS warning active; front-left wheel speed signal intermittent.",
+            updates: [
+              {
+                seed: "catalog-brakes-sensor-comment",
+                type: "comment",
+                createdByEmail: "tech1@test.com",
+                dateOffset: -2,
+                description: "Fault codes pulled — pointing to front-left sensor harness."
+              },
+              {
+                seed: "catalog-brakes-sensor-status",
+                type: "status_change",
+                createdByEmail: "tech1@test.com",
+                dateOffset: -2,
+                description: "Started harness inspection.",
+                statusFrom: "reported",
+                statusTo: "in_progress"
+              }
+            ]
+          }
+        ]
+      },
+      tires: {
+        conditionState: "replace_recommended",
+        lifecycleState: "near_end_of_life",
+        issues: [
+          {
+            seed: "catalog-tires-sidewall",
+            issueKey: "sidewall-damage",
+            title: "Nearside rear tyre sidewall impact damage",
+            status: "reported",
+            priority: "high",
+            assignedToEmail: "tech1@test.com",
+            createdByEmail: "manager@test.com",
+            createdOffset: -1,
+            dueOffset: 1,
+            description: "Visible bulge on nearside rear — bus grounded until resolved.",
+            updates: [
+              {
+                seed: "catalog-tires-sidewall-comment",
+                type: "comment",
+                createdByEmail: "manager@test.com",
+                dateOffset: -1,
+                description: "Photographed and bus removed from service immediately."
+              }
+            ]
+          }
+        ]
+      },
+      battery: {
+        conditionState: "repair_needed",
+        issues: [
+          {
+            seed: "catalog-battery-cell",
+            issueKey: "cell-failure",
+            title: "Battery cell failure confirmed",
+            status: "in_progress",
+            priority: "high",
+            assignedToEmail: "tech1@test.com",
+            createdByEmail: "manager@test.com",
+            createdOffset: -4,
+            dueOffset: 1,
+            description: "Load test failed; one cell below retention threshold.",
+            updates: [
+              {
+                seed: "catalog-battery-cell-comment",
+                type: "comment",
+                createdByEmail: "tech1@test.com",
+                dateOffset: -3,
+                description: "Replacement battery ordered; waiting for delivery."
+              },
+              {
+                seed: "catalog-battery-cell-status",
+                type: "status_change",
+                createdByEmail: "tech1@test.com",
+                dateOffset: -3,
+                description: "Moved to in progress while awaiting part.",
+                statusFrom: "reported",
+                statusTo: "in_progress"
+              }
+            ]
+          }
+        ]
+      },
+      suspension: {
+        conditionState: "repair_needed",
+        issues: [
+          {
+            seed: "catalog-suspension-bushing",
+            issueKey: "bushing-wear",
+            title: "Front suspension bushing play detected",
+            status: "reported",
+            priority: "medium",
+            assignedToEmail: "tech1@test.com",
+            createdByEmail: "manager@test.com",
+            createdOffset: -2,
+            dueOffset: 5,
+            description: "Clunking noise over rough road confirmed as bushing wear.",
+            updates: [
+              {
+                seed: "catalog-suspension-bushing-comment",
+                type: "comment",
+                createdByEmail: "manager@test.com",
+                dateOffset: -2,
+                description: "Logged after driver noise report."
+              }
+            ]
+          }
+        ]
+      },
+      cooling: {
+        conditionState: "repair_needed",
+        issues: [
+          {
+            seed: "catalog-cooling-fan",
+            issueKey: "fan-fault",
+            title: "Cooling fan not engaging at temperature",
+            status: "reported",
+            priority: "medium",
+            assignedToEmail: "tech1@test.com",
+            createdByEmail: "manager@test.com",
+            createdOffset: -2,
+            dueOffset: 4,
+            description: "Fan relay not activating at normal operating temperature.",
+            updates: [
+              {
+                seed: "catalog-cooling-fan-comment",
+                type: "comment",
+                createdByEmail: "manager@test.com",
+                dateOffset: -2,
+                description: "Reported alongside elevated coolant temperature readings."
+              }
+            ]
+          }
+        ]
+      },
+      transmission: {
+        conditionState: "repair_needed",
+        issues: [
+          {
+            seed: "catalog-transmission-shift",
+            issueKey: "shift-quality",
+            title: "Harsh gear changes under acceleration",
+            status: "reported",
+            priority: "medium",
+            assignedToEmail: "tech1@test.com",
+            createdByEmail: "manager@test.com",
+            createdOffset: -3,
+            dueOffset: 6,
+            description: "Drivers reporting delayed and harsh upshifts above 30 mph.",
+            updates: [
+              {
+                seed: "catalog-transmission-shift-comment",
+                type: "comment",
+                createdByEmail: "manager@test.com",
+                dateOffset: -3,
+                description: "Multiple driver reports over the past week."
+              }
+            ]
+          }
+        ]
+      },
+      electrical: {
+        conditionState: "repair_needed",
+        issues: [
+          {
+            seed: "catalog-electrical-sensor",
+            issueKey: "sensor-dropout",
+            title: "CAN bus sensor dropout on body controller",
+            status: "in_progress",
+            priority: "high",
+            assignedToEmail: "tech1@test.com",
+            createdByEmail: "manager@test.com",
+            createdOffset: -5,
+            dueOffset: 2,
+            description: "Intermittent sensor loss causing dashboard warning cascade.",
+            updates: [
+              {
+                seed: "catalog-electrical-sensor-comment",
+                type: "comment",
+                createdByEmail: "tech1@test.com",
+                dateOffset: -4,
+                description: "Scanning fault memory — CAN communication errors on body module."
+              },
+              {
+                seed: "catalog-electrical-sensor-status",
+                type: "status_change",
+                createdByEmail: "tech1@test.com",
+                dateOffset: -4,
+                description: "Investigation started.",
+                statusFrom: "reported",
+                statusTo: "in_progress"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    seed: "showcase:history",
+    registrationNumber: "DMO-108",
+    name: "Showcase Completed History",
+    depotSeed: "depot:north",
+    model: "Alexander Dennis Enviro 400 MMC",
+    year: 2020,
+    mileage: 176500,
+    lastServiceOffset: -10,
+    nextServiceOffset: 20,
+    partOverrides: {
+      engine: {
+        history: [
+          {
+            seed: "history-engine-mount-work",
+            type: "replacement",
+            technicianEmail: "tech2@test.com",
+            description: "Engine mount replaced following vibration report.",
+            dateOffset: -45
+          }
+        ],
+        issues: [
+          {
+            seed: "history-engine-mount",
+            issueKey: "mount-fatigue",
+            title: "Engine mount vibration resolved",
+            status: "resolved",
+            priority: "medium",
+            assignedToEmail: "tech2@test.com",
+            createdByEmail: "manager@test.com",
+            createdOffset: -48,
+            dueOffset: -45,
+            resolvedOffset: -45,
+            description: "Excess idle vibration confirmed as mount fatigue.",
+            updates: [
+              {
+                seed: "history-engine-mount-comment",
+                type: "comment",
+                createdByEmail: "tech2@test.com",
+                dateOffset: -47,
+                description: "Mount confirmed failed on inspection; replacement ordered."
+              },
+              {
+                seed: "history-engine-mount-signoff",
+                type: "sign_off",
+                createdByEmail: "tech2@test.com",
+                dateOffset: -45,
+                description: "Mount replaced and torqued to spec. Vibration resolved.",
+                statusFrom: "in_progress",
+                statusTo: "awaiting_approval",
+                stepNumber: 4
+              },
+              {
+                seed: "history-engine-mount-approved",
+                type: "status_change",
+                createdByEmail: "manager@test.com",
+                dateOffset: -44,
+                description: "Approved and closed.",
+                statusFrom: "awaiting_approval",
+                statusTo: "resolved"
+              }
+            ],
+            progress: {
+              currentStep: 4,
+              updatedByEmail: "tech2@test.com",
+              updatedOffset: -44,
+              completedOffset: -44,
+              signedOffByEmail: "tech2@test.com",
+              signedOffOffset: -45
+            }
+          }
+        ]
+      },
+      brakes: {
+        history: [
+          {
+            seed: "history-brakes-pad-work",
+            type: "replacement",
+            technicianEmail: "tech2@test.com",
+            description: "Full brake pad set replaced on both axles.",
+            dateOffset: -30
+          }
+        ],
+        issues: [
+          {
+            seed: "history-brakes-pad",
+            issueKey: "pad-wear",
+            title: "Brake pads replaced — both axles",
+            status: "resolved",
+            priority: "high",
+            assignedToEmail: "tech2@test.com",
+            createdByEmail: "manager@test.com",
+            createdOffset: -35,
+            dueOffset: -30,
+            resolvedOffset: -30,
+            description: "Pad thickness below depot safety threshold on routine check.",
+            updates: [
+              {
+                seed: "history-brakes-pad-comment",
+                type: "comment",
+                createdByEmail: "tech2@test.com",
+                dateOffset: -33,
+                description: "Both axles stripped; thickness at limit. New pads fitted."
+              },
+              {
+                seed: "history-brakes-pad-signoff",
+                type: "sign_off",
+                createdByEmail: "tech2@test.com",
+                dateOffset: -30,
+                description: "Pads fitted and bleed carried out. Rolling brake test passed.",
+                statusFrom: "in_progress",
+                statusTo: "awaiting_approval",
+                stepNumber: 4
+              },
+              {
+                seed: "history-brakes-pad-approved",
+                type: "status_change",
+                createdByEmail: "manager@test.com",
+                dateOffset: -29,
+                description: "Approved and closed.",
+                statusFrom: "awaiting_approval",
+                statusTo: "resolved"
+              }
+            ],
+            progress: {
+              currentStep: 4,
+              updatedByEmail: "tech2@test.com",
+              updatedOffset: -29,
+              completedOffset: -29,
+              signedOffByEmail: "tech2@test.com",
+              signedOffOffset: -30
+            }
+          }
+        ]
+      },
+      battery: {
+        history: [
+          {
+            seed: "history-battery-terminal-work",
+            type: "repair",
+            technicianEmail: "tech2@test.com",
+            description: "Battery terminals cleaned and treated.",
+            dateOffset: -20
+          }
+        ],
+        issues: [
+          {
+            seed: "history-battery-terminal",
+            issueKey: "terminal-corrosion",
+            title: "Battery terminal corrosion cleaned",
+            status: "resolved",
+            priority: "low",
+            assignedToEmail: "tech2@test.com",
+            createdByEmail: "manager@test.com",
+            createdOffset: -22,
+            dueOffset: -20,
+            resolvedOffset: -20,
+            description: "Visible corrosion on both terminals causing charging instability.",
+            updates: [
+              {
+                seed: "history-battery-terminal-comment",
+                type: "comment",
+                createdByEmail: "tech2@test.com",
+                dateOffset: -21,
+                description: "Terminals neutralised and contact surfaces polished."
+              },
+              {
+                seed: "history-battery-terminal-signoff",
+                type: "sign_off",
+                createdByEmail: "tech2@test.com",
+                dateOffset: -20,
+                description: "Charging voltage confirmed stable after treatment.",
+                statusFrom: "in_progress",
+                statusTo: "awaiting_approval",
+                stepNumber: 4
+              },
+              {
+                seed: "history-battery-terminal-approved",
+                type: "status_change",
+                createdByEmail: "manager@test.com",
+                dateOffset: -19,
+                description: "Approved and closed.",
+                statusFrom: "awaiting_approval",
+                statusTo: "resolved"
+              }
+            ],
+            progress: {
+              currentStep: 4,
+              updatedByEmail: "tech2@test.com",
+              updatedOffset: -19,
+              completedOffset: -19,
+              signedOffByEmail: "tech2@test.com",
+              signedOffOffset: -20
+            }
+          }
+        ]
+      },
+      transmission: {
+        history: [
+          {
+            seed: "history-transmission-clutch-work",
+            type: "replacement",
+            technicianEmail: "tech2@test.com",
+            description: "Clutch pack replaced following slip under load diagnosis.",
+            dateOffset: -60
+          }
+        ],
+        issues: [
+          {
+            seed: "history-transmission-clutch",
+            issueKey: "clutch-wear",
+            title: "Clutch pack slip under load resolved",
+            status: "resolved",
+            priority: "high",
+            assignedToEmail: "tech2@test.com",
+            createdByEmail: "manager@test.com",
+            createdOffset: -65,
+            dueOffset: -60,
+            resolvedOffset: -60,
+            description: "Transmission slipping at high load — internal clutch wear confirmed.",
+            updates: [
+              {
+                seed: "history-transmission-clutch-comment",
+                type: "comment",
+                createdByEmail: "tech2@test.com",
+                dateOffset: -63,
+                description: "Pressure test confirms clutch pack failure. Stripping transmission."
+              },
+              {
+                seed: "history-transmission-clutch-signoff",
+                type: "sign_off",
+                createdByEmail: "tech2@test.com",
+                dateOffset: -60,
+                description: "Clutch pack replaced. Refilled and shift quality verified.",
+                statusFrom: "in_progress",
+                statusTo: "awaiting_approval",
+                stepNumber: 4
+              },
+              {
+                seed: "history-transmission-clutch-approved",
+                type: "status_change",
+                createdByEmail: "manager@test.com",
+                dateOffset: -59,
+                description: "Approved and closed.",
+                statusFrom: "awaiting_approval",
+                statusTo: "resolved"
+              }
+            ],
+            progress: {
+              currentStep: 4,
+              updatedByEmail: "tech2@test.com",
+              updatedOffset: -59,
+              completedOffset: -59,
+              signedOffByEmail: "tech2@test.com",
+              signedOffOffset: -60
+            }
+          }
+        ]
+      },
+      electrical: {
+        history: [
+          {
+            seed: "history-electrical-lighting-work",
+            type: "replacement",
+            technicianEmail: "tech2@test.com",
+            description: "Failed exterior lamp units replaced on rear cluster.",
+            dateOffset: -15
+          }
+        ],
+        issues: [
+          {
+            seed: "history-electrical-lighting",
+            issueKey: "lighting-failure",
+            title: "Rear lighting cluster replaced",
+            status: "resolved",
+            priority: "low",
+            assignedToEmail: "tech2@test.com",
+            createdByEmail: "manager@test.com",
+            createdOffset: -18,
+            dueOffset: -15,
+            resolvedOffset: -15,
+            description: "Two rear lamp units inoperative following bulb check.",
+            updates: [
+              {
+                seed: "history-electrical-lighting-comment",
+                type: "comment",
+                createdByEmail: "tech2@test.com",
+                dateOffset: -17,
+                description: "Fuse and connector checked OK; lamp units confirmed failed."
+              },
+              {
+                seed: "history-electrical-lighting-signoff",
+                type: "sign_off",
+                createdByEmail: "tech2@test.com",
+                dateOffset: -15,
+                description: "Replacement units fitted and all switch positions verified.",
+                statusFrom: "in_progress",
+                statusTo: "awaiting_approval",
+                stepNumber: 4
+              },
+              {
+                seed: "history-electrical-lighting-approved",
+                type: "status_change",
+                createdByEmail: "manager@test.com",
+                dateOffset: -14,
+                description: "Approved and closed.",
+                statusFrom: "awaiting_approval",
+                statusTo: "resolved"
+              }
+            ],
+            progress: {
+              currentStep: 4,
+              updatedByEmail: "tech2@test.com",
+              updatedOffset: -14,
+              completedOffset: -14,
+              signedOffByEmail: "tech2@test.com",
+              signedOffOffset: -15
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    seed: "showcase:all-conditions",
+    registrationNumber: "DMO-109",
+    name: "Showcase All Conditions",
+    depotSeed: "depot:north",
+    model: "Alexander Dennis Enviro 400 MMC",
+    year: 2021,
+    mileage: 122700,
+    lastServiceOffset: -40,
+    nextServiceOffset: -7,
+    partOverrides: {
+      engine: {
+        conditionState: "good",
+        lifecycleState: "within_expected_life"
+      },
+      brakes: {
+        conditionState: "repair_needed",
+        lifecycleState: "near_end_of_life",
+        issues: [
+          {
+            seed: "allcond-brakes-fluid",
+            issueKey: "fluid-leak",
+            title: "Brake hydraulic leak — rear offside",
+            status: "reported",
+            priority: "high",
+            assignedToEmail: "tech2@test.com",
+            createdByEmail: "manager@test.com",
+            createdOffset: -2,
+            dueOffset: 1,
+            description: "Brake fluid pooling under rear offside wheel arch.",
+            updates: [
+              {
+                seed: "allcond-brakes-fluid-comment",
+                type: "comment",
+                createdByEmail: "manager@test.com",
+                dateOffset: -2,
+                description: "Bus grounded. Fluid trail traced to rear caliper."
+              }
+            ]
+          }
+        ]
+      },
+      tires: {
+        conditionState: "replace_recommended",
+        lifecycleState: "beyond_expected_life",
+        issues: [
+          {
+            seed: "allcond-tires-tread",
+            issueKey: "low-tread",
+            title: "Tyre tread at service limit",
+            status: "in_progress",
+            priority: "medium",
+            assignedToEmail: "tech2@test.com",
+            createdByEmail: "manager@test.com",
+            createdOffset: -5,
+            dueOffset: 2,
+            description: "All four tyres measured at or below minimum tread depth.",
+            updates: [
+              {
+                seed: "allcond-tires-tread-comment",
+                type: "comment",
+                createdByEmail: "tech2@test.com",
+                dateOffset: -4,
+                description: "Replacement set sourced; waiting on bay availability."
+              },
+              {
+                seed: "allcond-tires-tread-status",
+                type: "status_change",
+                createdByEmail: "tech2@test.com",
+                dateOffset: -4,
+                description: "Moved to in progress.",
+                statusFrom: "reported",
+                statusTo: "in_progress"
+              }
+            ]
+          }
+        ]
+      },
+      battery: {
+        conditionState: "good",
+        lifecycleState: "beyond_life_approved",
+        lastReplacementOffset: -1200
+      },
+      suspension: {
+        conditionState: "good",
+        lifecycleState: "near_end_of_life"
+      },
+      cooling: {
+        conditionState: "repair_needed",
+        lifecycleState: "within_expected_life",
+        issues: [
+          {
+            seed: "allcond-cooling-thermostat",
+            issueKey: "thermostat-stuck",
+            title: "Thermostat slow to open on warm-up",
+            status: "awaiting_approval",
+            priority: "medium",
+            assignedToEmail: "tech2@test.com",
+            createdByEmail: "manager@test.com",
+            createdOffset: -8,
+            dueOffset: -1,
+            description: "Engine slow to reach operating temperature — thermostat replaced.",
+            updates: [
+              {
+                seed: "allcond-cooling-thermostat-comment",
+                type: "comment",
+                createdByEmail: "tech2@test.com",
+                dateOffset: -6,
+                description: "Live data confirmed thermostat stuck partially closed."
+              },
+              {
+                seed: "allcond-cooling-thermostat-status",
+                type: "status_change",
+                createdByEmail: "tech2@test.com",
+                dateOffset: -5,
+                description: "Started replacement.",
+                statusFrom: "reported",
+                statusTo: "in_progress"
+              },
+              {
+                seed: "allcond-cooling-thermostat-signoff",
+                type: "sign_off",
+                createdByEmail: "tech2@test.com",
+                dateOffset: -1,
+                description: "Thermostat and seal replaced. Warm-up cycle normal. Awaiting sign-off.",
+                statusFrom: "in_progress",
+                statusTo: "awaiting_approval",
+                stepNumber: 4
+              }
+            ],
+            progress: {
+              currentStep: 4,
+              updatedByEmail: "tech2@test.com",
+              updatedOffset: -1,
+              signedOffByEmail: "tech2@test.com",
+              signedOffOffset: -1
+            }
+          }
+        ]
+      },
+      transmission: {
+        conditionState: "good",
+        lifecycleState: "beyond_expected_life",
+        lastReplacementOffset: -900
+      },
+      electrical: {
+        conditionState: "good",
+        lifecycleState: "within_expected_life"
+      }
+    }
   }
 ];
 
@@ -862,9 +1585,14 @@ const run = async () => {
         || null;
     };
 
+    const getIssueTypeIdByKey = (partCode, issueKey) =>
+      issueTypeIdByKey.get(`${partCode}:${issueKey}`) || getIssueTypeIdForScenario(partCode, "repair");
+
     const upsertShowcaseIssue = async ({ issue, partId, partCode, busName }) => {
       const issueId = stableUuid(`showcase:issue:${issue.seed}`);
-      const issueTypeId = getIssueTypeIdForScenario(partCode, issue.preferredAction || "repair");
+      const issueTypeId = issue.issueKey
+        ? getIssueTypeIdByKey(partCode, issue.issueKey)
+        : getIssueTypeIdForScenario(partCode, issue.preferredAction || "repair");
       const createdById = userIdByEmail.get(issue.createdByEmail) || null;
       const assignedUserId = userIdByEmail.get(issue.assignedToEmail) || null;
       const createdAt = getRelativeTimestamp(issue.createdOffset);

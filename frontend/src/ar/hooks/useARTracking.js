@@ -238,6 +238,10 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly, mo
           return getThemeColor("--muted-foreground", "#94a3b8");
         }
 
+        if (matchedMarker.markerType === "tool" && mode === "maintenance") {
+          return getThemeColor("--status-tool", "#3b82f6");
+        }
+
         if (matchedMarker.markerType === "part") {
           switch (matchedMarker.status) {
             case "Good":
@@ -268,7 +272,7 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly, mo
         }
       };
 
-      const createStatusSprite = (accentColor) => {
+      const createStatusSprite = (accentColor, label = null) => {
         const statusCanvas = document.createElement("canvas");
         statusCanvas.width = 256;
         statusCanvas.height = 256;
@@ -287,6 +291,33 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly, mo
         ctx.lineWidth = 12;
         ctx.strokeStyle = "rgba(255,255,255,0.92)";
         ctx.stroke();
+
+        if (label) {
+          const fontSize = 22;
+          ctx.font = `700 ${fontSize}px system-ui, sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = "rgba(255,255,255,0.95)";
+          const maxWidth = 148;
+          const words = String(label).split(" ");
+          const lines = [];
+          let currentLine = words[0];
+          for (let wi = 1; wi < words.length; wi += 1) {
+            const test = `${currentLine} ${words[wi]}`;
+            if (ctx.measureText(test).width <= maxWidth) {
+              currentLine = test;
+            } else {
+              lines.push(currentLine);
+              currentLine = words[wi];
+            }
+          }
+          lines.push(currentLine);
+          const lineHeight = fontSize + 5;
+          const startY = 128 - ((lines.length - 1) * lineHeight) / 2;
+          for (let li = 0; li < lines.length; li += 1) {
+            ctx.fillText(lines[li], 128, startY + li * lineHeight, maxWidth);
+          }
+        }
 
         const texture = new THREE.CanvasTexture(statusCanvas);
         texture.needsUpdate = true;
@@ -353,9 +384,12 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly, mo
 
       const updateMarkerSprites = (entry, matchedMarker, accentColor) => {
         const useToolLabel = mode === "tool-tracker" && matchedMarker?.markerType === "tool";
+        const inlineLabel = mode === "maintenance" && matchedMarker?.markerType === "tool"
+          ? (matchedMarker?.name || null)
+          : null;
         const nextSpriteKey = useToolLabel
           ? `tool-label:${matchedMarker?.name || ""}:${accentColor}`
-          : `status:${accentColor}`;
+          : `status:${inlineLabel || ""}:${accentColor}`;
 
         if (entry.spriteKey === nextSpriteKey && entry.statusSprite) {
           return;
@@ -368,7 +402,7 @@ export const useARTracking = ({ appState, arReady, markers, showCapturedOnly, mo
 
         const statusSprite = useToolLabel
           ? createToolLabelSprite(matchedMarker?.name, accentColor)
-          : createStatusSprite(accentColor);
+          : createStatusSprite(accentColor, inlineLabel);
         if (!statusSprite) return;
 
         entry.stableRoot.add(statusSprite);
