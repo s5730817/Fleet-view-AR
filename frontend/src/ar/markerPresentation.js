@@ -3,6 +3,7 @@ export const MARKER_TONES = {
   GOOD: "good",
   WARNING: "warning",
   CRITICAL: "critical",
+  TOOL: "tool",
 };
 
 export const getPartMarkerTone = (status) => {
@@ -58,6 +59,8 @@ export const getMarkerToneColorToken = (tone) => {
       return { cssVar: "--status-service", fallback: "#f59e0b" };
     case MARKER_TONES.CRITICAL:
       return { cssVar: "--status-urgent", fallback: "#ef4444" };
+    case MARKER_TONES.TOOL:
+      return { cssVar: "--status-tool", fallback: "#3b82f6" };
     default:
       return { cssVar: "--muted-foreground", fallback: "#94a3b8" };
   }
@@ -70,6 +73,7 @@ export const maintenanceLegendSections = [
       { tone: MARKER_TONES.GOOD, label: "Green", description: "OK" },
       { tone: MARKER_TONES.WARNING, label: "Yellow", description: "Due soon" },
       { tone: MARKER_TONES.CRITICAL, label: "Red", description: "Needs repair" },
+      { tone: MARKER_TONES.TOOL, label: "Blue", description: "Nearby tool" },
     ],
   },
 ];
