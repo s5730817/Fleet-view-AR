@@ -312,10 +312,14 @@ export function TrackingView({
       return;
     }
 
+    const steps = (selectedPart.issueTypeOptions || []).filter(
+      (option) => !option.excludeFromInspection && option.inspectionStep
+    );
+
     setInspectionWorkflow({
       partId: selectedPart.id,
       partName: selectedPart.name,
-      steps: selectedPart.issueTypeOptions || [],
+      steps,
       currentStepIndex: 0,
       foundIssueCount: 0,
       isComplete: false,
@@ -673,9 +677,9 @@ export function TrackingView({
                     type="button"
                     onClick={handleCompleteInspection}
                     disabled={isSigningOff}
-                    className="rounded-md bg-emerald-500 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-lg border border-emerald-400/60 bg-emerald-600/80 px-4 py-3 text-base font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {isSigningOff ? "Saving..." : inspectionWorkflow.foundIssueCount === 0 ? "Mark as Good" : "Close Inspection"}
+                    {isSigningOff ? "Saving..." : inspectionWorkflow.foundIssueCount === 0 ? "✓ Mark as Good" : "Close Inspection"}
                   </button>
                 </div>
               </div>
@@ -684,22 +688,22 @@ export function TrackingView({
 
               return step ? (
                 <div className="rounded-xl border border-white/10 bg-black/60 p-3">
-                  <p className="font-semibold text-white">{step.label}</p>
+                  <p className="font-semibold text-white">{step.inspectionStep || step.label}</p>
                   <p className="mt-1 text-xs text-white/70">{step.summary}</p>
                   <div className="mt-3 flex gap-2">
                     <button
                       type="button"
                       onClick={handleInspectionOK}
-                      className="flex-1 rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"
+                      className="flex-1 rounded-lg border border-emerald-400/60 bg-emerald-600/80 px-4 py-3 text-base font-semibold text-white shadow-sm"
                     >
-                      OK
+                      ✓ All Good
                     </button>
                     <button
                       type="button"
                       onClick={handleInspectionIssueOpen}
-                      className="flex-1 rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"
+                      className="flex-1 rounded-lg border border-amber-400/60 bg-amber-500/25 px-4 py-3 text-base font-semibold text-amber-200 shadow-sm"
                     >
-                      Issue Found
+                      ⚠ Issue Found
                     </button>
                   </div>
                 </div>
@@ -941,11 +945,17 @@ export function TrackingView({
                   <p className="mt-1 text-white/70">
                     Each known issue type becomes a check step. Press OK to pass a step or Issue Found to log a problem.
                   </p>
-                  {(selectedPart?.issueTypeOptions?.length ?? 0) > 0 && (
-                    <p className="mt-2 text-xs text-white/60">
-                      {selectedPart.issueTypeOptions.length} check{selectedPart.issueTypeOptions.length === 1 ? "" : "s"}: {selectedPart.issueTypeOptions.map((o) => o.label).join(" · ")}
-                    </p>
-                  )}
+                  {(selectedPart?.issueTypeOptions?.length ?? 0) > 0 && (() => {
+                    const inspectionSteps = selectedPart.issueTypeOptions.filter(
+                      (o) => !o.excludeFromInspection && o.inspectionStep
+                    );
+
+                    return inspectionSteps.length > 0 ? (
+                      <p className="mt-2 text-xs text-white/60">
+                        {inspectionSteps.length} check{inspectionSteps.length === 1 ? "" : "s"}: {inspectionSteps.map((o) => o.inspectionStep).join(" · ")}
+                      </p>
+                    ) : null;
+                  })()}
                 </div>
               )}
 
@@ -986,7 +996,7 @@ export function TrackingView({
         return (
           <div className="fixed inset-0 z-[1006] overflow-y-auto bg-black/82 p-4">
             <div className="ar-glass-strong mx-auto mt-4 w-full max-w-md rounded-xl border border-white/15 p-4 text-white shadow-xl backdrop-blur sm:mt-10">
-              <h3 className="text-lg font-bold">Log Issue: {step?.label}</h3>
+              <h3 className="text-lg font-bold">Log Issue: {step?.inspectionStep || step?.label}</h3>
               <p className="mt-1 text-sm text-white/70">{step?.summary}</p>
 
               <div className="mt-4">

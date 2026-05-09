@@ -773,6 +773,7 @@ const run = async () => {
           code,
           label,
           summary,
+          inspection_step,
           default_priority,
           recommended_action,
           guide_title,
@@ -780,11 +781,12 @@ const run = async () => {
           required_tool_types,
           created_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, NOW())
         ON CONFLICT (code) DO UPDATE
         SET part_code = EXCLUDED.part_code,
             label = EXCLUDED.label,
             summary = EXCLUDED.summary,
+            inspection_step = EXCLUDED.inspection_step,
             default_priority = EXCLUDED.default_priority,
             recommended_action = EXCLUDED.recommended_action,
             guide_title = EXCLUDED.guide_title,
@@ -796,6 +798,7 @@ const run = async () => {
           issueType.key,
           issueType.label,
           issueType.summary,
+          issueType.inspectionStep || null,
           issueType.priority,
           issueType.recommendedAction,
           issueType.guideTitle,

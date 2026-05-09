@@ -84,6 +84,7 @@ CREATE TABLE "issue_types" (
   "code" text UNIQUE NOT NULL,
   "label" text NOT NULL,
   "summary" text,
+  "inspection_step" text,
   "default_priority" text,
   "recommended_action" text,
   "guide_title" text,

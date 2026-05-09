@@ -110,6 +110,8 @@ const mapIssueTypeOption = (issueType, partInstructions = []) => ({
   key: issueType.code,
   label: issueType.label,
   summary: issueType.summary || "",
+  inspectionStep: issueType.inspection_step || null,
+  excludeFromInspection: issueType.code === "inspection-required",
   priority: issueType.default_priority || "medium",
   recommendedAction: issueType.recommended_action || "repair",
   guide: buildGuideFromIssueType(issueType, partInstructions)
@@ -396,15 +398,7 @@ exports.getARContext = async (id, user) => {
       const issueTypeOptions = [
         ...(issueTypesByPartCode.get(partCode) || []),
         ...(partCode === "generic" ? [] : (issueTypesByPartCode.get("generic") || []))
-      ].map((issueType) => ({
-        id: issueType.id,
-        key: issueType.code,
-        label: issueType.label,
-        summary: issueType.summary || "",
-        priority: issueType.default_priority || "medium",
-        recommendedAction: issueType.recommended_action || "repair",
-        guide: buildGuideFromIssueType(issueType, partInstructions)
-      }));
+      ].map((issueType) => mapIssueTypeOption(issueType, partInstructions));
 
       return {
         id: part.id,
