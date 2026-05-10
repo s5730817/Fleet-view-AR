@@ -4,11 +4,11 @@ This folder holds the project documentation that used to live in the root README
 
 ## Start Here
 
-- [running-the-project.md](./running-the-project.md): installation, mock mode, PostgreSQL mode, HTTPS certificates, LAN access, and offline preview instructions for Linux, macOS, and Windows.
+- [running-the-project.md](./running-the-project.md): the only setup and run guide you need. It covers `npm run dev:https` for macOS, Linux, and Windows.
 - [project-components.md](./project-components.md): main system components and how the frontend, backend, database, and AR features fit together.
 - [data-structures.md](./data-structures.md): core entities, status enums, and the main payload shapes shared across the app.
 - [user-stories.md](./user-stories.md): role-based user stories and the main field workflows supported by the product.
-- [postgres-ar-setup.md](./postgres-ar-setup.md): PostgreSQL and AR-specific notes with links back to the main run guide.
+- [postgres-ar-setup.md](./postgres-ar-setup.md): PostgreSQL and AR-specific notes.
 
 ## Existing Project Areas
 

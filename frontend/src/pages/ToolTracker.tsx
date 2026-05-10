@@ -88,7 +88,7 @@ export default function ToolTracker() {
   if (!isManager) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <Card className="w-full max-w-lg border-orange-200/70 bg-card/95 shadow-xl">
+        <Card className="w-full max-w-lg border border-white/15 bg-card/90 shadow-2xl backdrop-blur-xl">
           <CardHeader>
             <div className="flex items-center gap-3 text-orange-600">
               <ShieldAlert className="h-6 w-6" />
@@ -121,7 +121,7 @@ export default function ToolTracker() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-lg border-white/70 bg-card/95 shadow-xl">
+      <Card className="w-full max-w-lg border border-white/15 bg-card/90 shadow-2xl backdrop-blur-xl">
         <CardHeader>
           <CardTitle className="text-xl">Opening Tool Tracker</CardTitle>
           <CardDescription>

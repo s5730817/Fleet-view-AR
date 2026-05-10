@@ -64,9 +64,7 @@ export function ToolTrackingView({
   const remainingTools = toolChecklist.length - foundTools.length;
   const headerTrackingMessage = trackingMessage?.startsWith("No markers detected") ? "" : trackingMessage;
   const checklistButtonLabel = isChecklistOpen ? "Hide list" : `Checklist ${foundTools.length}/${toolChecklist.length || 0}`;
-  const checklistButtonCompactLabel = isChecklistOpen ? "Hide" : `${foundTools.length}/${toolChecklist.length || 0}`;
   const signOffButtonLabel = isSignedOff ? "Signed off" : "Sign off";
-  const signOffButtonCompactLabel = isSignedOff ? "Done" : "Sign";
   const canSignOff = toolChecklist.length > 0 && remainingTools === 0;
 
   const checklistPanel = (
@@ -142,8 +140,7 @@ export function ToolTrackingView({
               className={`inline-flex max-w-full items-center gap-1 whitespace-nowrap rounded-full border border-white/20 bg-white/10 px-2.5 py-2 text-xs font-semibold text-white sm:gap-2 sm:px-4 sm:text-sm ${isChecklistOpen ? "md:hidden" : ""}`}
             >
               <ListChecks className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="truncate sm:hidden">{checklistButtonCompactLabel}</span>
-              <span className="hidden truncate sm:inline">{checklistButtonLabel}</span>
+              <span className="truncate">{checklistButtonLabel}</span>
               {isChecklistOpen ? <ChevronUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
             </button>
           </div>
@@ -155,8 +152,7 @@ export function ToolTrackingView({
               disabled={!canSignOff || isSignedOff}
               className="whitespace-nowrap rounded-full border border-emerald-300/30 bg-emerald-500/15 px-2.5 py-2 text-xs font-semibold text-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:text-sm"
             >
-              <span className="sm:hidden">{signOffButtonCompactLabel}</span>
-              <span className="hidden sm:inline">{signOffButtonLabel}</span>
+              {signOffButtonLabel}
             </button>
           </div>
         </div>
@@ -207,6 +203,7 @@ export function ToolTrackingView({
           </div>
         </div>
       )}
+
     </div>
   );
 }
