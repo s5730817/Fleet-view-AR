@@ -152,13 +152,11 @@ const users = [
 const depots = [
   {
     seed: "depot:central",
-    name: "Central Depot",
-    location: "City Centre"
+    name: "Central Depot"
   },
   {
     seed: "depot:north",
-    name: "North Depot",
-    location: "North Yard"
+    name: "North Depot"
   }
 ];
 
@@ -1342,6 +1340,7 @@ const run = async () => {
   const busIdByLegacyId = new Map();
   const partIdByLegacyKey = new Map();
   const toolTypeIdByName = new Map();
+  const partTypeIdByCode = new Map();
   const issueTypeIdByKey = new Map();
   const issueTypesByPartCode = new Map();
   let showcaseIssueCount = 0;
@@ -1349,27 +1348,9 @@ const run = async () => {
 
   await db.withTransaction(async (client) => {
     await client.query(
-      `DELETE FROM comments
-       WHERE issue_id IN (
-         SELECT id FROM issues WHERE title = 'DB smoke fault'
-       )`
-    );
-    await client.query(
-      `DELETE FROM issue_progress
-       WHERE issue_id IN (
-         SELECT id FROM issues WHERE title = 'DB smoke fault'
-       )`
-    );
-    await client.query(
       `DELETE FROM issue_assignments
        WHERE issue_id IN (
          SELECT id FROM issues WHERE title = 'DB smoke fault'
-       )`
-    );
-    await client.query(
-      `DELETE FROM comments
-       WHERE user_id IN (
-         SELECT id FROM users WHERE email LIKE 'dbsmoke_%'
        )`
     );
     await client.query(
@@ -1401,12 +1382,11 @@ const run = async () => {
       const depotId = stableUuid(depot.seed);
       depotIdBySeed.set(depot.seed, depotId);
       await client.query(
-        `INSERT INTO depots (id, name, location, created_at)
-         VALUES ($1, $2, $3, NOW())
+        `INSERT INTO depots (id, name, created_at)
+         VALUES ($1, $2, NOW())
          ON CONFLICT (id) DO UPDATE
-         SET name = EXCLUDED.name,
-             location = EXCLUDED.location`,
-        [depotId, depot.name, depot.location]
+         SET name = EXCLUDED.name`,
+        [depotId, depot.name]
       );
     }
 
@@ -1445,36 +1425,62 @@ const run = async () => {
       );
     }
 
+    const partTypeCodes = [...new Set([
+      ...lifecyclePolicies.map((policy) => policy.partCode),
+      ...getIssueCatalogEntries().map((issueType) => issueType.partCode)
+    ])];
+
+    const partTypeLabelByCode = {
+      engine: "Engine",
+      brakes: "Brakes",
+      tires: "Tires",
+      battery: "Battery",
+      suspension: "Suspension",
+      cooling: "Cooling System",
+      transmission: "Transmission",
+      electrical: "Electrical Systems",
+      generic: "Generic"
+    };
+
+    for (const partTypeCode of partTypeCodes) {
+      const partTypeId = stableUuid(`part-type:${partTypeCode}`);
+      partTypeIdByCode.set(partTypeCode, partTypeId);
+      await client.query(
+        `INSERT INTO part_types (id, code, name, created_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (code) DO UPDATE
+         SET name = EXCLUDED.name`,
+        [partTypeId, partTypeCode, partTypeLabelByCode[partTypeCode] || partTypeCode]
+      );
+    }
+
     for (const policy of lifecyclePolicies) {
       const policyId = stableUuid(`part-policy:${policy.partCode}`);
       await client.query(
         `INSERT INTO part_lifecycle_policies (
           id,
-          part_code,
+          part_type_id,
           usage_model,
           expected_life_days,
           expected_life_mileage,
           inspection_interval_days,
-          replacement_rule,
           created_at,
           updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-        ON CONFLICT (part_code) DO UPDATE
+        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+        ON CONFLICT (part_type_id) DO UPDATE
         SET usage_model = EXCLUDED.usage_model,
             expected_life_days = EXCLUDED.expected_life_days,
             expected_life_mileage = EXCLUDED.expected_life_mileage,
             inspection_interval_days = EXCLUDED.inspection_interval_days,
-            replacement_rule = EXCLUDED.replacement_rule,
             updated_at = NOW()`,
         [
           policyId,
-          policy.partCode,
+          partTypeIdByCode.get(policy.partCode),
           policy.usageModel,
           policy.expectedLifeDays ?? null,
           policy.expectedLifeMileage ?? null,
-          policy.inspectionIntervalDays ?? null,
-          policy.replacementRule ?? null
+          policy.inspectionIntervalDays ?? null
         ]
       );
     }
@@ -1492,7 +1498,7 @@ const run = async () => {
       await client.query(
         `INSERT INTO issue_types (
           id,
-          part_code,
+          part_type_id,
           code,
           label,
           summary,
@@ -1506,7 +1512,7 @@ const run = async () => {
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, NOW())
         ON CONFLICT (code) DO UPDATE
-        SET part_code = EXCLUDED.part_code,
+        SET part_type_id = EXCLUDED.part_type_id,
             label = EXCLUDED.label,
             summary = EXCLUDED.summary,
             inspection_step = EXCLUDED.inspection_step,
@@ -1517,7 +1523,7 @@ const run = async () => {
             required_tool_types = EXCLUDED.required_tool_types`,
         [
           issueTypeId,
-          issueType.partCode,
+          partTypeIdByCode.get(issueType.partCode),
           issueType.key,
           issueType.label,
           issueType.summary,
@@ -1705,68 +1711,7 @@ const run = async () => {
           ]
         );
 
-        if (update.type === "comment") {
-          await client.query(
-            `INSERT INTO comments (id, issue_id, user_id, content, created_at)
-             VALUES ($1, $2, $3, $4, $5)
-             ON CONFLICT (id) DO UPDATE
-             SET issue_id = EXCLUDED.issue_id,
-                 user_id = EXCLUDED.user_id,
-                 content = EXCLUDED.content,
-                 created_at = EXCLUDED.created_at`,
-            [
-              stableUuid(`showcase:comment:${update.seed}`),
-              issueId,
-              updateCreatedById,
-              update.description,
-              updateCreatedAt
-            ]
-          );
-        }
       }
-
-      const progress = issue.progress || {
-        currentStep: issue.status === "awaiting_approval" || issue.status === "resolved"
-          ? 5
-          : issue.status === "in_progress"
-            ? 2
-            : 0,
-        updatedByEmail: issue.assignedToEmail || issue.createdByEmail,
-        updatedOffset: issue.updatedOffset ?? issue.createdOffset,
-        completedOffset: issue.resolvedOffset,
-      };
-
-      await client.query(
-        `INSERT INTO issue_progress (
-          id,
-          issue_id,
-          current_step,
-          updated_by,
-          updated_at,
-          completed_at,
-          signed_off_by,
-          signed_off_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        ON CONFLICT (id) DO UPDATE
-        SET issue_id = EXCLUDED.issue_id,
-            current_step = EXCLUDED.current_step,
-            updated_by = EXCLUDED.updated_by,
-            updated_at = EXCLUDED.updated_at,
-            completed_at = EXCLUDED.completed_at,
-            signed_off_by = EXCLUDED.signed_off_by,
-            signed_off_at = EXCLUDED.signed_off_at`,
-        [
-          stableUuid(`showcase:progress:${issue.seed}`),
-          issueId,
-          progress.currentStep || 0,
-          userIdByEmail.get(progress.updatedByEmail || issue.assignedToEmail || issue.createdByEmail) || null,
-          getRelativeTimestamp(progress.updatedOffset ?? issue.createdOffset),
-          progress.completedOffset === undefined ? null : getRelativeTimestamp(progress.completedOffset),
-          progress.signedOffByEmail ? userIdByEmail.get(progress.signedOffByEmail) || null : null,
-          progress.signedOffOffset === undefined ? null : getRelativeTimestamp(progress.signedOffOffset)
-        ]
-      );
 
       showcaseIssueCount += 1;
     };
@@ -1827,6 +1772,7 @@ const run = async () => {
           `INSERT INTO bus_parts (
             id,
             bus_id,
+            part_type_id,
             name,
             marker_code,
             icon_key,
@@ -1838,9 +1784,10 @@ const run = async () => {
             last_replacement_at,
             ar_instructions
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb)
           ON CONFLICT (id) DO UPDATE
           SET bus_id = EXCLUDED.bus_id,
+              part_type_id = EXCLUDED.part_type_id,
               name = EXCLUDED.name,
               marker_code = EXCLUDED.marker_code,
               icon_key = EXCLUDED.icon_key,
@@ -1854,6 +1801,7 @@ const run = async () => {
           [
             partId,
             busId,
+            partTypeIdByCode.get(partCode),
             baseComponent.name,
             getBusMarkerCode(partIndex),
             baseComponent.icon,
@@ -2011,6 +1959,7 @@ const run = async () => {
           `INSERT INTO bus_parts (
             id,
             bus_id,
+            part_type_id,
             name,
             marker_code,
             icon_key,
@@ -2022,9 +1971,10 @@ const run = async () => {
             last_replacement_at,
             ar_instructions
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb)
           ON CONFLICT (id) DO UPDATE
           SET bus_id = EXCLUDED.bus_id,
+              part_type_id = EXCLUDED.part_type_id,
               name = EXCLUDED.name,
               marker_code = EXCLUDED.marker_code,
               icon_key = EXCLUDED.icon_key,
@@ -2038,6 +1988,7 @@ const run = async () => {
           [
             partId,
             busId,
+            partTypeIdByCode.get(resolvePartCode(component.name, component.id)),
             component.name,
             getBusMarkerCode(componentIndex),
             component.icon,
@@ -2299,37 +2250,6 @@ const run = async () => {
         );
       }
 
-      await client.query(
-        `INSERT INTO issue_progress (
-          id,
-          issue_id,
-          current_step,
-          updated_by,
-          updated_at,
-          completed_at,
-          signed_off_by,
-          signed_off_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        ON CONFLICT (id) DO UPDATE
-        SET issue_id = EXCLUDED.issue_id,
-            current_step = EXCLUDED.current_step,
-            updated_by = EXCLUDED.updated_by,
-            updated_at = EXCLUDED.updated_at,
-            completed_at = EXCLUDED.completed_at,
-            signed_off_by = EXCLUDED.signed_off_by,
-            signed_off_at = EXCLUDED.signed_off_at`,
-        [
-          stableUuid(`progress:${job.id}`),
-          issueId,
-          currentStep,
-          assignedUserId,
-          signedOff ? dueAt : createdAt,
-          completedAt,
-          signOffAt ? assignedUserId : null,
-          signOffAt
-        ]
-      );
     }
 
     const faultTargets = {
@@ -2429,24 +2349,6 @@ const run = async () => {
           ]
         );
 
-        if (update.update_type === "comment") {
-          await client.query(
-            `INSERT INTO comments (id, issue_id, user_id, content, created_at)
-             VALUES ($1, $2, $3, $4, $5)
-             ON CONFLICT (id) DO UPDATE
-             SET issue_id = EXCLUDED.issue_id,
-                 user_id = EXCLUDED.user_id,
-                 content = EXCLUDED.content,
-                 created_at = EXCLUDED.created_at`,
-            [
-              stableUuid(`comment:fault:${fault.id}:${update.id}`),
-              issueId,
-              seededUserId,
-              update.description,
-              toTimestamp(update.created_at)
-            ]
-          );
-        }
       }
     }
   });

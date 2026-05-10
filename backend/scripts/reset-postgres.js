@@ -7,18 +7,15 @@ process.env.DATA_SOURCE = "postgres";
 const db = require("../src/database/db");
 
 const tablesToTruncate = [
-  "activity_logs",
-  "comments",
-  "issue_progress",
   "repair_guide_tool_types",
   "repair_steps",
   "repair_guides",
-  "issue_links",
   "issue_assignments",
   "maintenance_entries",
   "issue_updates",
   "issues",
   "bus_parts",
+  "part_types",
   "buses",
   "tools",
   "tool_types",

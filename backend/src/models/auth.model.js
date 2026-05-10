@@ -30,8 +30,7 @@ exports.getUserByEmail = async (email) => {
      FROM users
      LEFT JOIN roles ON roles.id = users.role_id
      LEFT JOIN depots ON depots.id = users.depot_id
-     WHERE LOWER(users.email) = LOWER($1)
-       AND users.deleted_at IS NULL`,
+     WHERE LOWER(users.email) = LOWER($1)`,
     [email]
   );
 
@@ -52,8 +51,7 @@ exports.getUserById = async (id) => {
      FROM users
      LEFT JOIN roles ON roles.id = users.role_id
      LEFT JOIN depots ON depots.id = users.depot_id
-     WHERE users.id = $1
-       AND users.deleted_at IS NULL`,
+     WHERE users.id = $1`,
     [id]
   );
 

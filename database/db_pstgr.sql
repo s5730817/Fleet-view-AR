@@ -8,7 +8,6 @@ CREATE TABLE "roles" (
 CREATE TABLE "depots" (
   "id" uuid PRIMARY KEY,
   "name" text NOT NULL,
-  "location" text,
   "created_at" timestamp
 );
 
@@ -19,8 +18,7 @@ CREATE TABLE "users" (
   "password_hash" text NOT NULL,
   "role_id" uuid,
   "depot_id" uuid,
-  "created_at" timestamp,
-  "deleted_at" timestamp
+  "created_at" timestamp
 );
 
 CREATE TABLE "tool_types" (
@@ -51,9 +49,17 @@ CREATE TABLE "buses" (
   "year" int
 );
 
+CREATE TABLE "part_types" (
+  "id" uuid PRIMARY KEY,
+  "code" text UNIQUE NOT NULL,
+  "name" text NOT NULL,
+  "created_at" timestamp
+);
+
 CREATE TABLE "bus_parts" (
   "id" uuid PRIMARY KEY,
   "bus_id" uuid,
+  "part_type_id" uuid,
   "name" text NOT NULL,
   "marker_code" int,
   "icon_key" text,
@@ -68,19 +74,18 @@ CREATE TABLE "bus_parts" (
 
 CREATE TABLE "part_lifecycle_policies" (
   "id" uuid PRIMARY KEY,
-  "part_code" text UNIQUE NOT NULL,
+  "part_type_id" uuid UNIQUE NOT NULL,
   "usage_model" text NOT NULL,
   "expected_life_days" int,
   "expected_life_mileage" int,
   "inspection_interval_days" int,
-  "replacement_rule" text,
   "created_at" timestamp,
   "updated_at" timestamp
 );
 
 CREATE TABLE "issue_types" (
   "id" uuid PRIMARY KEY,
-  "part_code" text NOT NULL,
+  "part_type_id" uuid NOT NULL,
   "code" text UNIQUE NOT NULL,
   "label" text NOT NULL,
   "summary" text,
@@ -143,12 +148,6 @@ CREATE TABLE "issue_assignments" (
   "assigned_at" timestamp
 );
 
-CREATE TABLE "issue_links" (
-  "id" uuid PRIMARY KEY,
-  "parent_issue_id" uuid,
-  "child_issue_id" uuid
-);
-
 CREATE TABLE "repair_guides" (
   "id" uuid PRIMARY KEY,
   "bus_part_id" uuid,
@@ -168,34 +167,7 @@ CREATE TABLE "repair_guide_tool_types" (
   "tool_type_id" uuid
 );
 
-CREATE TABLE "issue_progress" (
-  "id" uuid PRIMARY KEY,
-  "issue_id" uuid,
-  "current_step" int,
-  "updated_by" uuid,
-  "updated_at" timestamp,
-  "completed_at" timestamp,
-  "signed_off_by" uuid,
-  "signed_off_at" timestamp
-);
 
-CREATE TABLE "comments" (
-  "id" uuid PRIMARY KEY,
-  "issue_id" uuid,
-  "user_id" uuid,
-  "content" text,
-  "created_at" timestamp
-);
-
-CREATE TABLE "activity_logs" (
-  "id" uuid PRIMARY KEY,
-  "user_id" uuid,
-  "action" text,
-  "entity_type" text,
-  "entity_id" uuid,
-  "metadata" jsonb,
-  "created_at" timestamp
-);
 
 CREATE UNIQUE INDEX ON "users" ("email");
 
@@ -213,9 +185,11 @@ CREATE UNIQUE INDEX ON "buses" ("registration_number");
 
 CREATE UNIQUE INDEX ON "bus_parts" ("bus_id", "marker_code");
 
-CREATE UNIQUE INDEX ON "part_lifecycle_policies" ("part_code");
+CREATE INDEX ON "bus_parts" ("part_type_id");
 
-CREATE INDEX ON "issue_types" ("part_code");
+CREATE UNIQUE INDEX ON "part_lifecycle_policies" ("part_type_id");
+
+CREATE INDEX ON "issue_types" ("part_type_id");
 
 CREATE INDEX ON "issue_types" ("label");
 
@@ -247,12 +221,6 @@ CREATE INDEX ON "issue_assignments" ("user_id");
 
 CREATE UNIQUE INDEX ON "issue_assignments" ("issue_id", "user_id");
 
-CREATE INDEX ON "issue_links" ("parent_issue_id");
-
-CREATE INDEX ON "issue_links" ("child_issue_id");
-
-CREATE UNIQUE INDEX ON "issue_links" ("parent_issue_id", "child_issue_id");
-
 CREATE UNIQUE INDEX ON "repair_guides" ("bus_part_id");
 
 CREATE INDEX ON "repair_steps" ("guide_id");
@@ -263,17 +231,6 @@ CREATE INDEX ON "repair_guide_tool_types" ("guide_id");
 
 CREATE INDEX ON "repair_guide_tool_types" ("tool_type_id");
 
-CREATE UNIQUE INDEX ON "issue_progress" ("issue_id");
-
-CREATE INDEX ON "comments" ("issue_id");
-
-CREATE INDEX ON "comments" ("user_id");
-
-CREATE INDEX ON "activity_logs" ("user_id");
-
-CREATE INDEX ON "activity_logs" ("entity_type", "entity_id");
-
-CREATE INDEX ON "activity_logs" ("created_at");
 
 COMMENT ON COLUMN "tools"."status" IS 'available | in_use | awaiting_return';
 
@@ -283,11 +240,7 @@ COMMENT ON COLUMN "bus_parts"."lifecycle_state" IS 'within_expected_life | near_
 
 COMMENT ON COLUMN "part_lifecycle_policies"."usage_model" IS 'days | mileage | issue_burden | inspection';
 
-COMMENT ON COLUMN "issue_types"."recommended_action" IS 'repair | replacement';
-
 COMMENT ON COLUMN "issues"."status" IS 'reported | in_progress | awaiting_approval | resolved';
-
-COMMENT ON COLUMN "issues"."priority" IS 'low | medium | high | critical';
 
 COMMENT ON COLUMN "issue_updates"."update_type" IS 'comment | status_change | progress | sign_off | split';
 
@@ -307,8 +260,11 @@ ALTER TABLE "buses" ADD FOREIGN KEY ("depot_id") REFERENCES "depots" ("id") DEFE
 
 ALTER TABLE "bus_parts" ADD FOREIGN KEY ("bus_id") REFERENCES "buses" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "part_lifecycle_policies" ADD CONSTRAINT "part_lifecycle_policies_part_code_check"
-  CHECK (part_code <> '');
+ALTER TABLE "bus_parts" ADD FOREIGN KEY ("part_type_id") REFERENCES "part_types" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "part_lifecycle_policies" ADD FOREIGN KEY ("part_type_id") REFERENCES "part_types" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "issue_types" ADD FOREIGN KEY ("part_type_id") REFERENCES "part_types" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "issues" ADD FOREIGN KEY ("bus_part_id") REFERENCES "bus_parts" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
@@ -332,10 +288,6 @@ ALTER TABLE "issue_assignments" ADD FOREIGN KEY ("issue_id") REFERENCES "issues"
 
 ALTER TABLE "issue_assignments" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "issue_links" ADD FOREIGN KEY ("parent_issue_id") REFERENCES "issues" ("id") DEFERRABLE INITIALLY IMMEDIATE;
-
-ALTER TABLE "issue_links" ADD FOREIGN KEY ("child_issue_id") REFERENCES "issues" ("id") DEFERRABLE INITIALLY IMMEDIATE;
-
 ALTER TABLE "repair_guides" ADD FOREIGN KEY ("bus_part_id") REFERENCES "bus_parts" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "repair_steps" ADD FOREIGN KEY ("guide_id") REFERENCES "repair_guides" ("id") DEFERRABLE INITIALLY IMMEDIATE;
@@ -344,14 +296,4 @@ ALTER TABLE "repair_guide_tool_types" ADD FOREIGN KEY ("guide_id") REFERENCES "r
 
 ALTER TABLE "repair_guide_tool_types" ADD FOREIGN KEY ("tool_type_id") REFERENCES "tool_types" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "issue_progress" ADD FOREIGN KEY ("issue_id") REFERENCES "issues" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "issue_progress" ADD FOREIGN KEY ("updated_by") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
-
-ALTER TABLE "issue_progress" ADD FOREIGN KEY ("signed_off_by") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
-
-ALTER TABLE "comments" ADD FOREIGN KEY ("issue_id") REFERENCES "issues" ("id") DEFERRABLE INITIALLY IMMEDIATE;
-
-ALTER TABLE "comments" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
-
-ALTER TABLE "activity_logs" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;

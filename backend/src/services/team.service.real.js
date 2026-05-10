@@ -54,8 +54,7 @@ exports.getTeamMembers = async (user) => {
       ) THEN 'On Job' ELSE 'Active' END AS status
      FROM users
      LEFT JOIN roles ON roles.id = users.role_id
-     WHERE users.deleted_at IS NULL
-       AND roles.name IN ('engineer', 'manager', 'admin')
+     WHERE roles.name IN ('engineer', 'manager', 'admin')
        AND ($1::uuid IS NULL OR users.depot_id = $1)
      ORDER BY
        CASE roles.name

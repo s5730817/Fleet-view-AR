@@ -116,20 +116,41 @@ exports.getLifecyclePoliciesForPartCodes = async (partCodes) => {
     return [];
   }
 
-  const result = await db.query(
-    `SELECT
-      part_code,
-      usage_model,
-      expected_life_days,
-      expected_life_mileage,
-      inspection_interval_days,
-      replacement_rule
-     FROM part_lifecycle_policies
-     WHERE part_code = ANY($1::text[])`,
-    [normalizedCodes]
-  );
+  try {
+    const result = await db.query(
+      `SELECT
+        part_types.code AS part_code,
+        usage_model,
+        expected_life_days,
+        expected_life_mileage,
+        inspection_interval_days
+       FROM part_lifecycle_policies
+       INNER JOIN part_types ON part_types.id = part_lifecycle_policies.part_type_id
+       WHERE part_types.code = ANY($1::text[])`,
+      [normalizedCodes]
+    );
 
-  return result.rows;
+    return result.rows;
+  } catch (error) {
+    if (!error || !["42P01", "42703"].includes(error.code)) {
+      throw error;
+    }
+
+    // Backward compatibility for databases that still use part_code.
+    const legacyResult = await db.query(
+      `SELECT
+        part_code,
+        usage_model,
+        expected_life_days,
+        expected_life_mileage,
+        inspection_interval_days
+       FROM part_lifecycle_policies
+       WHERE part_code = ANY($1::text[])`,
+      [normalizedCodes]
+    );
+
+    return legacyResult.rows;
+  }
 };
 
 exports.updatePartLifecycleAfterMaintenance = async (partId, entryType, executor = db) => {
@@ -471,27 +492,57 @@ exports.getIssueTypesForPartCodes = async (partCodes) => {
     return [];
   }
 
-  const result = await db.query(
-    `SELECT
-      id,
-      part_code,
-      code,
-      label,
-      summary,
-      inspection_step,
-      default_priority,
-      recommended_action,
-      guide_title,
-      guide_steps,
-      required_tool_types
-     FROM issue_types
-     WHERE part_code = ANY($1::text[])
-        OR part_code = 'generic'
-     ORDER BY part_code ASC, label ASC`,
-    [normalizedCodes]
-  );
+  try {
+    const result = await db.query(
+      `SELECT
+        issue_types.id,
+        part_types.code AS part_code,
+        issue_types.code,
+        issue_types.label,
+        issue_types.summary,
+        issue_types.inspection_step,
+        issue_types.default_priority,
+        issue_types.recommended_action,
+        issue_types.guide_title,
+        issue_types.guide_steps,
+        issue_types.required_tool_types
+       FROM issue_types
+       INNER JOIN part_types ON part_types.id = issue_types.part_type_id
+       WHERE part_types.code = ANY($1::text[])
+          OR part_types.code = 'generic'
+       ORDER BY part_types.code ASC, issue_types.label ASC`,
+      [normalizedCodes]
+    );
 
-  return result.rows;
+    return result.rows;
+  } catch (error) {
+    if (!error || !["42P01", "42703"].includes(error.code)) {
+      throw error;
+    }
+
+    // Backward compatibility for databases that still use part_code.
+    const legacyResult = await db.query(
+      `SELECT
+        id,
+        part_code,
+        code,
+        label,
+        summary,
+        inspection_step,
+        default_priority,
+        recommended_action,
+        guide_title,
+        guide_steps,
+        required_tool_types
+       FROM issue_types
+       WHERE part_code = ANY($1::text[])
+          OR part_code = 'generic'
+       ORDER BY part_code ASC, label ASC`,
+      [normalizedCodes]
+    );
+
+    return legacyResult.rows;
+  }
 };
 
 exports.getIssueHistoryForPartIds = async (partIds) => {
@@ -578,8 +629,7 @@ exports.getAssignableUsersForDepot = async (depotId = null) => {
       roles.name AS role
      FROM users
      LEFT JOIN roles ON roles.id = users.role_id
-     WHERE users.deleted_at IS NULL
-       AND roles.name IN ('engineer', 'manager', 'admin')
+     WHERE roles.name IN ('engineer', 'manager', 'admin')
        AND ($1::uuid IS NULL OR users.depot_id = $1)
      ORDER BY
        CASE roles.name
