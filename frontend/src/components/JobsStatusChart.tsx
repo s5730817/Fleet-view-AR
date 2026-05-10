@@ -19,7 +19,8 @@ interface Props {
 }
 
 const statusColors: Record<string, string> = {
-  Open: "hsl(var(--primary))",
+  "Awaiting Approval": "#f97316",
+  Open: "#3b82f6",
   "In Progress": "#eab308",
   Completed: "#22c55e",
   Overdue: "#ef4444",
@@ -27,13 +28,25 @@ const statusColors: Record<string, string> = {
 
 export const JobsByStatusChart = ({ data }: Props) => {
   return (
-    <div className="h-[280px] w-full">
+    <div className="h-[320px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data}>
+        <BarChart
+          data={data}
+          margin={{ top: 10, right: 10, left: 20, bottom: 5 }}
+        >
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="status" />
+
+          <XAxis
+            dataKey="status"
+            interval={0}
+            height={40}
+            tick={{ fontSize: 11 }}
+          />
+
           <YAxis />
+
           <Tooltip />
+
           <Bar dataKey="value" radius={[8, 8, 0, 0]}>
             {data.map((item) => (
               <Cell
