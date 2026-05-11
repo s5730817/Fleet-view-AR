@@ -21,6 +21,49 @@ exports.getAllBuses = async (req, res) => {
   }
 };
 
+exports.getMaintenanceAnomalies = async (req, res) => {
+  try {
+    const options = {
+      recentWindowDays: req.query.recentWindowDays
+          ? Number(req.query.recentWindowDays)
+          : undefined,
+      baselineWindowDays: req.query.baselineWindowDays
+          ? Number(req.query.baselineWindowDays)
+          : undefined,
+      mediumRiskThreshold: req.query.mediumRiskThreshold
+          ? Number(req.query.mediumRiskThreshold)
+          : undefined,
+      highRiskThreshold: req.query.highRiskThreshold
+          ? Number(req.query.highRiskThreshold)
+          : undefined,
+    };
+
+    Object.keys(options).forEach((key) => {
+      if (options[key] === undefined || Number.isNaN(options[key])) {
+        delete options[key];
+      }
+    });
+
+    const anomalies = await fleetService.getMaintenanceAnomalies(
+        req.user,
+        options
+    );
+
+    res.status(200).json({
+      success: true,
+      generatedAt: new Date().toISOString(),
+      count: anomalies.length,
+      data: anomalies
+    });
+  } catch (err) {
+    console.error("Error detecting maintenance anomalies:", err);
+    res.status(500).json({
+      success: false,
+      error: "Could not detect maintenance anomalies"
+    });
+  }
+};
+
 // GET one bus by id
 exports.getBusById = async (req, res) => {
   try {
@@ -116,10 +159,10 @@ exports.getBusARContext = async (req, res) => {
 exports.addMaintenanceEntry = async (req, res) => {
   try {
     const entry = await fleetService.addMaintenanceEntry(
-      req.params.id,
-      req.params.componentId,
-      req.body,
-      req.user
+        req.params.id,
+        req.params.componentId,
+        req.body,
+        req.user
     );
 
     if (!entry) {
