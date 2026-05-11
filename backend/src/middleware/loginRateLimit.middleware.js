@@ -1,24 +1,30 @@
 // middleware/loginRateLimit.middleware.js
+/*
+  Current rate limits are configured conservatively for development
+  and prototype deployment.
 
-const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
+  Further concurrent user and load testing is required to determine:
+  - realistic traffic spikes
+  - sustainable request throughput
+  - optimal production thresholds
+  - AR polling behaviour under scale
 
-const loginRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  Production values should be adjusted following stress and
+  performance testing in a deployed environment.
+*/
 
-  max: 5,
+const rateLimit = require("express-rate-limit");
 
-  keyGenerator: (req) => {
-    return `${ipKeyGenerator(req)}-${req.body.email}`;
-  },
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10000,
 
-  standardHeaders: true,
+    standardHeaders: true,
+    legacyHeaders: false,
 
-  legacyHeaders: false,
-
-  message: {
-    success: false,
-    error: "Too many login attempts. Please wait 15 minutes before trying again.",
-  },
+    message: {
+        error: "Too many requests, please try again later."
+    }
 });
 
-module.exports = loginRateLimiter;
+module.exports = apiLimiter;

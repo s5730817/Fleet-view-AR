@@ -1,5 +1,7 @@
 // @vitest-environment node
 // tests/security/login.test.ts
+// run server with test ENV command for test
+// $env:NODE_ENV="test"; npx nodemon src/server.js
 
 import { describe, test, expect } from "vitest";
 

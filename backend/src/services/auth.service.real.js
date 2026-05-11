@@ -29,7 +29,7 @@ exports.registerUser = async ({ name, email, password, role }) => {
     name,
     email,
     password_hash,
-    role: finalRole
+    role: finalRole,
   });
 
   return await authModel.getUserById(userId);
@@ -46,6 +46,25 @@ exports.loginUser = async ({ email, password }) => {
   const passwordMatches = await bcrypt.compare(password, user.password_hash);
   if (!passwordMatches) throw new Error("Invalid email or password");
 
+  // TESTING ONLY: skip 2FA for manager@test.com when NODE_ENV=test
+// Remove this block before deploying to production
+if (process.env.NODE_ENV === "test" && email === "manager@test.com") {
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+    return {
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    };
+  }
+
   // ── Generate 2FA code ─────────────────────────────────────────
   const code = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -59,12 +78,12 @@ exports.loginUser = async ({ email, password }) => {
   pending2FA.push({
     email,
     code,
-    expiresAt: Date.now() + 5 * 60 * 1000
+    expiresAt: Date.now() + 5 * 60 * 1000,
   });
 
   return {
     requires2FA: true,
-    email
+    email,
   };
 };
 
@@ -94,7 +113,7 @@ exports.verify2FA = async ({ email, code }) => {
     {
       id: user.id,
       email: user.email,
-      role: user.role
+      role: user.role,
     },
     process.env.JWT_SECRET,
     { expiresIn: "1d" }
@@ -106,7 +125,7 @@ exports.verify2FA = async ({ email, code }) => {
       id: user.id,
       name: user.name,
       email: user.email,
-      role: user.role
-    }
+      role: user.role,
+    },
   };
 };

@@ -11,7 +11,7 @@ const validate = (req, res, next) => {
 
 // POST /faults
 const validateCreateFault = [
-  body("title").isString().notEmpty().withMessage("Title is required"),
+  body("title").trim().isString().notEmpty().withMessage("Title is required"),
   body("description").isString().notEmpty().withMessage("Description is required"),
   body("priority").isIn(["low", "medium", "high"]).withMessage("Priority must be low, medium or high"),
   body("bus_part_id").optional().isString(),

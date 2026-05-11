@@ -5,7 +5,11 @@ export default defineConfig({
   test: {
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.{test,spec}.{ts,tsx}", "tests/**/*.test.ts"],
+    include: [
+      "src/**/*.{test,spec}.{ts,tsx}",
+      "tests/**/*.test.ts"
+    ],
+
     projects: [
       {
         test: {
@@ -13,6 +17,21 @@ export default defineConfig({
           environment: "node",
         },
       },
+
+      {
+        test: {
+          include: ["tests/validation/**/*.test.ts"],
+          environment: "node",
+        },
+      },
+
+      {
+        test: {
+          include: ["tests/performance/**/*.test.ts"],
+          environment: "node",
+        },
+      },
+
       {
         test: {
           include: ["src/**/*.{test,spec}.{ts,tsx}"],
@@ -21,7 +40,10 @@ export default defineConfig({
       },
     ],
   },
+
   resolve: {
-    alias: { "@": path.resolve(__dirname, "./src") },
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
   },
 });

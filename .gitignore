@@ -6,3 +6,4 @@ ca.crt
 *.key
 *.crt
 *.pem
+*.zip
