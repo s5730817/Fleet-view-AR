@@ -2,14 +2,23 @@ const { randomUUID } = require("crypto");
 const authModel = require("../models/auth.model");
 const faultModel = require("../models/fault.model");
 const fleetModel = require("../models/fleet.model");
+
 const {
+  detectMaintenanceFrequencyAnomalies
+} = require("../utils/maintenanceAnomalyModel");
+const {
+
   resolvePartCode
 } = require("../utils/arIssueCatalog");
 const {
-  buildComponentPresentationFields,
-  buildBusMaintenanceFields,
-  buildBusMaintenanceStatus
-} = require("./fleetPresentation.shared");
+  COMPONENT_INDICATOR_LABELS,
+  COMPONENT_STATUS_LABELS,
+  deriveComponentPresentation,
+  deriveBusMaintenanceSummary,
+  LIFECYCLE_LABELS,
+  normalizeLifecycleState,
+  normalizeComponentState
+} = require("../utils/maintenanceStatus");
 
 const formatDate = (value) => {
   if (!value) {
@@ -58,8 +67,8 @@ const buildGuideFromIssueType = (issueType, partInstructions = []) => ({
   title: issueType?.guide_title || "Inspection Guide",
   recommendedAction: issueType?.recommended_action || "repair",
   steps: Array.isArray(issueType?.guide_steps) && issueType.guide_steps.length > 0
-    ? [...issueType.guide_steps, ...partInstructions.slice(0, 2)]
-    : [...partInstructions],
+      ? [...issueType.guide_steps, ...partInstructions.slice(0, 2)]
+      : [...partInstructions],
   requiredToolTypes: Array.isArray(issueType?.required_tool_types) ? issueType.required_tool_types : []
 });
 
@@ -110,8 +119,6 @@ const mapIssueTypeOption = (issueType, partInstructions = []) => ({
   key: issueType.code,
   label: issueType.label,
   summary: issueType.summary || "",
-  inspectionStep: issueType.inspection_step || null,
-  excludeFromInspection: issueType.code === "inspection-required",
   priority: issueType.default_priority || "medium",
   recommendedAction: issueType.recommended_action || "repair",
   guide: buildGuideFromIssueType(issueType, partInstructions)
@@ -133,7 +140,6 @@ const mapIssueSnapshot = (issue, matchingIssueType) => ({
   assignedToName: issue.assigned_to_name || null,
   assignedToEmail: issue.assigned_to_email || null,
   pendingMaintenanceApproval: Boolean(issue.maintenance_approval_metadata),
-  pendingMaintenancePreviousStatus: issue.maintenance_approval_status_from || null,
 });
 
 const mapBusSummary = (bus, parts, issues) => ({
@@ -142,7 +148,7 @@ const mapBusSummary = (bus, parts, issues) => ({
   plateNumber: bus.registration_number,
   depotId: bus.depot_id || null,
   depotName: bus.depot_name || null,
-  status: buildBusMaintenanceStatus({
+  status: deriveBusMaintenanceSummary({
     nextServiceAt: bus.next_service_at,
     issues,
     components: parts.map((part) => ({
@@ -167,8 +173,8 @@ const resolveUserScope = async (user) => {
 
   const persistedUser = await authModel.getUserById(user.id);
   const role = typeof persistedUser?.role === "string"
-    ? persistedUser.role.trim().toLowerCase()
-    : fallbackRole;
+      ? persistedUser.role.trim().toLowerCase()
+      : fallbackRole;
 
   return {
     role,
@@ -183,14 +189,20 @@ const mapPart = (part, entriesByPartId, issuesByPartId, policyByPartCode) => {
   const partCode = resolvePartCode(part.name, part.icon_key);
   const activeIssues = issuesByPartId.get(part.id) || [];
   const lifecyclePolicy = policyByPartCode.get(partCode) || null;
-  const presentation = buildComponentPresentationFields({
+  const presentation = deriveComponentPresentation({
     conditionState: part.condition_state,
     lifecycleState: part.lifecycle_state,
     issues: activeIssues,
     lastInspectedAt: part.last_inspected_at,
     inspectionIntervalDays: lifecyclePolicy?.usage_model === "inspection"
-      ? lifecyclePolicy.inspection_interval_days ?? null
-      : null
+        ? lifecyclePolicy.inspection_interval_days ?? null
+        : null
+  });
+  const normalizedState = normalizeComponentState({
+    conditionState: part.condition_state
+  });
+  const normalizedLifecycleState = normalizeLifecycleState({
+    lifecycleState: part.lifecycle_state
   });
 
   return {
@@ -199,7 +211,16 @@ const mapPart = (part, entriesByPartId, issuesByPartId, policyByPartCode) => {
     name: part.name,
     markerCode: part.marker_code,
     icon: part.icon_key || "Wrench",
-    ...presentation,
+    status: presentation.status,
+    statusState: presentation.statusState,
+    statusNote: presentation.statusNote,
+    conditionState: normalizedState,
+    conditionLabel: COMPONENT_STATUS_LABELS[normalizedState] || COMPONENT_INDICATOR_LABELS[normalizedState],
+    lifecycleState: normalizedLifecycleState,
+    lifecycleLabel: LIFECYCLE_LABELS[normalizedLifecycleState],
+    maintenanceIndicator: presentation.maintenanceIndicator,
+    activeIssueCount: presentation.activeIssueCount,
+    inProgressIssueCount: presentation.inProgressIssueCount,
     lastRepair: formatDate(part.last_repair_at),
     lastInspected: formatDate(part.last_inspected_at),
     lastService: formatDate(part.last_service_at),
@@ -211,7 +232,7 @@ const mapPart = (part, entriesByPartId, issuesByPartId, policyByPartCode) => {
 
 const mapBus = (bus, partsByBusId, entriesByPartId, issuesByPartId, policyByPartCode, issues) => {
   const mappedParts = (partsByBusId.get(bus.id) || []).map((part) => mapPart(part, entriesByPartId, issuesByPartId, policyByPartCode));
-  const maintenanceSummary = buildBusMaintenanceFields({
+  const maintenanceSummary = deriveBusMaintenanceSummary({
     nextServiceAt: bus.next_service_at,
     issues,
     components: mappedParts
@@ -288,12 +309,12 @@ const hydrateBuses = async (buses) => {
   }
 
   return buses.map((bus) => mapBus(
-    bus,
-    partsByBusId,
-    entriesByPartId,
-    issuesByPartId,
-    policyByPartCode,
-    issuesByBusId.get(bus.id) || []
+      bus,
+      partsByBusId,
+      entriesByPartId,
+      issuesByPartId,
+      policyByPartCode,
+      issuesByBusId.get(bus.id) || []
   ));
 };
 
@@ -355,8 +376,8 @@ exports.getARContext = async (id, user) => {
     title: issueType?.guide_title || "Inspection Guide",
     recommendedAction: issueType?.recommended_action || "repair",
     steps: Array.isArray(issueType?.guide_steps) && issueType.guide_steps.length > 0
-      ? [...issueType.guide_steps, ...partInstructions.slice(0, 2)]
-      : [...partInstructions],
+        ? [...issueType.guide_steps, ...partInstructions.slice(0, 2)]
+        : [...partInstructions],
     requiredToolTypes: Array.isArray(issueType?.required_tool_types) ? issueType.required_tool_types : []
   });
 
@@ -383,7 +404,7 @@ exports.getARContext = async (id, user) => {
       plateNumber: bus.registration_number,
       depotId: bus.depot_id || null,
       depotName: bus.depot_name || null,
-      status: buildBusMaintenanceStatus({
+      status: deriveBusMaintenanceSummary({
         nextServiceAt: bus.next_service_at,
         issues,
         components: parts.map((part) => ({
@@ -398,7 +419,15 @@ exports.getARContext = async (id, user) => {
       const issueTypeOptions = [
         ...(issueTypesByPartCode.get(partCode) || []),
         ...(partCode === "generic" ? [] : (issueTypesByPartCode.get("generic") || []))
-      ].map((issueType) => mapIssueTypeOption(issueType, partInstructions));
+      ].map((issueType) => ({
+        id: issueType.id,
+        key: issueType.code,
+        label: issueType.label,
+        summary: issueType.summary || "",
+        priority: issueType.default_priority || "medium",
+        recommendedAction: issueType.recommended_action || "repair",
+        guide: buildGuideFromIssueType(issueType, partInstructions)
+      }));
 
       return {
         id: part.id,
@@ -407,31 +436,39 @@ exports.getARContext = async (id, user) => {
         markerCode: part.marker_code,
         icon: part.icon_key || "Wrench",
         ...(() => {
-          const presentation = buildComponentPresentationFields({
+          const presentation = deriveComponentPresentation({
             conditionState: part.condition_state,
             lifecycleState: part.lifecycle_state,
             issues: issuesByPartId.get(part.id) || [],
             lastInspectedAt: part.last_inspected_at,
             inspectionIntervalDays: policyByPartCode.get(partCode)?.usage_model === "inspection"
-              ? policyByPartCode.get(partCode)?.inspection_interval_days ?? null
-              : null
+                ? policyByPartCode.get(partCode)?.inspection_interval_days ?? null
+                : null
           });
 
           return {
             status: presentation.status,
             maintenanceIndicator: presentation.maintenanceIndicator,
-            conditionState: presentation.conditionState,
-            conditionLabel: presentation.conditionLabel || "Good",
-            lifecycleState: presentation.lifecycleState,
-            lifecycleLabel: presentation.lifecycleLabel,
           };
         })(),
+        conditionState: normalizeComponentState({
+          conditionState: part.condition_state
+        }),
+        conditionLabel: COMPONENT_STATUS_LABELS[normalizeComponentState({
+          conditionState: part.condition_state
+        })] || "Good",
+        lifecycleState: normalizeLifecycleState({
+          lifecycleState: part.lifecycle_state
+        }),
+        lifecycleLabel: LIFECYCLE_LABELS[normalizeLifecycleState({
+          lifecycleState: part.lifecycle_state
+        })],
         arInstructions: partInstructions,
         issueTypeOptions,
         activeIssues: (issuesByPartId.get(part.id) || []).map((issue) => {
           const matchingIssueType = issueTypeOptions.find((issueType) => issueType.id === issue.issue_type_id)
-            || issueTypeOptions.find((issueType) => issueType.key === issue.issue_type_code)
-            || null;
+              || issueTypeOptions.find((issueType) => issueType.key === issue.issue_type_code)
+              || null;
 
           const issueSnapshot = mapIssueSnapshot(issue, matchingIssueType);
 
@@ -476,9 +513,9 @@ exports.getARCatalog = async (user) => {
     depotId: scope.restrictToDepot ? scope.depotId : null
   });
   const uniqueDepots = [...new Map(
-    visibleBuses
-      .filter((bus) => bus.depot_id)
-      .map((bus) => [bus.depot_id, { depotId: bus.depot_id, depotName: bus.depot_name || "Depot" }])
+      visibleBuses
+          .filter((bus) => bus.depot_id)
+          .map((bus) => [bus.depot_id, { depotId: bus.depot_id, depotName: bus.depot_name || "Depot" }])
   ).values()];
   const visibleBusIds = visibleBuses.map((bus) => bus.id);
   const parts = await fleetModel.getPartsForBusIds(visibleBusIds);
@@ -486,10 +523,10 @@ exports.getARCatalog = async (user) => {
   const issueTypes = await fleetModel.getIssueTypesForPartCodes(partCodes);
 
   const issueTypesByPartCode = Object.fromEntries(
-    [...buildIssueTypesByPartCode(issueTypes).entries()].map(([partCode, partIssueTypes]) => [
-      partCode,
-      partIssueTypes.map((issueType) => mapIssueTypeOption(issueType))
-    ])
+      [...buildIssueTypesByPartCode(issueTypes).entries()].map(([partCode, partIssueTypes]) => [
+        partCode,
+        partIssueTypes.map((issueType) => mapIssueTypeOption(issueType))
+      ])
   );
 
   const depotResourcesById = {};
@@ -549,14 +586,14 @@ exports.getARSnapshot = async (id, user) => {
         ...(issueTypesByPartCode.get(partCode) || []),
         ...(partCode === "generic" ? [] : (issueTypesByPartCode.get("generic") || []))
       ].map((issueType) => mapIssueTypeOption(issueType, partInstructions));
-      const presentation = buildComponentPresentationFields({
+      const presentation = deriveComponentPresentation({
         conditionState: part.condition_state,
         lifecycleState: part.lifecycle_state,
         issues: issuesByPartId.get(part.id) || [],
         lastInspectedAt: part.last_inspected_at,
         inspectionIntervalDays: policyByPartCode.get(partCode)?.usage_model === "inspection"
-          ? policyByPartCode.get(partCode)?.inspection_interval_days ?? null
-          : null
+            ? policyByPartCode.get(partCode)?.inspection_interval_days ?? null
+            : null
       });
 
       return {
@@ -567,15 +604,23 @@ exports.getARSnapshot = async (id, user) => {
         icon: part.icon_key || "Wrench",
         status: presentation.status,
         maintenanceIndicator: presentation.maintenanceIndicator,
-        conditionState: presentation.conditionState,
-        conditionLabel: presentation.conditionLabel || "Good",
-        lifecycleState: presentation.lifecycleState,
-        lifecycleLabel: presentation.lifecycleLabel,
+        conditionState: normalizeComponentState({
+          conditionState: part.condition_state
+        }),
+        conditionLabel: COMPONENT_STATUS_LABELS[normalizeComponentState({
+          conditionState: part.condition_state
+        })] || "Good",
+        lifecycleState: normalizeLifecycleState({
+          lifecycleState: part.lifecycle_state
+        }),
+        lifecycleLabel: LIFECYCLE_LABELS[normalizeLifecycleState({
+          lifecycleState: part.lifecycle_state
+        })],
         arInstructions: partInstructions,
         activeIssues: (issuesByPartId.get(part.id) || []).map((issue) => {
           const matchingIssueType = issueTypeOptions.find((issueType) => issueType.id === issue.issue_type_id)
-            || issueTypeOptions.find((issueType) => issueType.key === issue.issue_type_code)
-            || null;
+              || issueTypeOptions.find((issueType) => issueType.key === issue.issue_type_code)
+              || null;
 
           return mapIssueSnapshot(issue, matchingIssueType);
         })
@@ -635,13 +680,13 @@ exports.addMaintenanceEntry = async (busId, componentId, body, user) => {
 
   const activeIssues = await fleetModel.getIssuesForPartIds([componentId]);
   const activeIssueIds = new Set(
-    activeIssues
-      .filter((issue) => ["reported", "in_progress", "awaiting_approval"].includes(issue.status))
-      .map((issue) => issue.id)
+      activeIssues
+          .filter((issue) => ["reported", "in_progress", "awaiting_approval"].includes(issue.status))
+          .map((issue) => issue.id)
   );
   const resolvedIssueIds = Array.isArray(body.resolved_issue_ids)
-    ? [...new Set(body.resolved_issue_ids.filter((issueId) => typeof issueId === "string" && issueId.trim().length > 0))]
-    : [];
+      ? [...new Set(body.resolved_issue_ids.filter((issueId) => typeof issueId === "string" && issueId.trim().length > 0))]
+      : [];
 
   if (body.type === "service" && resolvedIssueIds.length > 0) {
     throw new Error("Service entries cannot resolve issues");
