@@ -38,7 +38,15 @@ PGPASSWORD=admin-pgr-db77
 
 ## 3. Create the Local HTTPS Certificate
 
-Run this from `frontend/`:
+`npm run cert:dev` requires a local CA key and certificate to already exist at `frontend/ca.key` and `frontend/ca.crt`. These are not committed to the repo and must be generated once:
+
+```bash
+cd frontend
+openssl genrsa -out ca.key 4096
+openssl req -x509 -new -nodes -key ca.key -sha256 -days 1825 -out ca.crt -subj "/CN=Fleet-View-AR Local CA"
+```
+
+Then run the cert script from `frontend/`:
 
 ```bash
 npm run cert:dev
@@ -64,13 +72,22 @@ If you want to open the app from another device on the same network, use the mac
 
 ## 5. Optional Database Setup
 
-If you want PostgreSQL-backed data, run these commands from the project root:
+Before applying the schema, the PostgreSQL role and database must exist. On a fresh install, create them as the `postgres` superuser:
+
+```bash
+sudo -u postgres psql -c "CREATE ROLE admin WITH LOGIN PASSWORD 'admin-pgr-db77';"
+sudo -u postgres psql -c "CREATE DATABASE fleetar OWNER admin;"
+```
+
+Then apply the schema and seed from the project root:
 
 ```bash
 psql -h localhost -U admin -d fleetar -f database/db_pstgr.sql
 cd backend
 npm run seed:postgres
 ```
+
+> **Note:** `database/db_pstgr.sql` uses plain `CREATE TABLE` statements without `IF NOT EXISTS`. Running it against an already-initialised database will print errors for each existing table but will still apply indexes and constraints correctly. The errors are safe to ignore on repeat runs.
 
 ## 6. Restart After Changes
 
