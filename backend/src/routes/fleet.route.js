@@ -12,6 +12,10 @@ const { authoriseRoles } = require("../middleware/role.middleware");
 // Accessible to any authenticated user (protected at app level)
 router.get("/", fleetController.getAllBuses);
 
+// GET predictive maintenance anomaly results
+// Must be before /:id so it is not treated as a bus id
+router.get("/maintenance-anomalies", fleetController.getMaintenanceAnomalies);
+
 // GET depot-scoped AR catalog shared across visible buses
 router.get("/ar-catalog", fleetController.getARCatalog);
 
@@ -28,9 +32,9 @@ router.get("/:id/ar-context", fleetController.getBusARContext);
 // CREATE a new maintenance entry for a component
 // Restricted to engineer/manager/admin roles only
 router.post(
-  "/:id/components/:componentId/history",
-  authoriseRoles("engineer", "manager", "admin"),
-  fleetController.addMaintenanceEntry
+    "/:id/components/:componentId/history",
+    authoriseRoles("engineer", "manager", "admin"),
+    fleetController.addMaintenanceEntry
 );
 
 module.exports = router;
