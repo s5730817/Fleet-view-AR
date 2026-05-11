@@ -1,18 +1,28 @@
 // This file contains the main fleet logic using temporary mock data.
 
+// This file contains the main fleet logic using temporary mock data.
+
 const { randomUUID } = require("crypto");
 const faultService = require("./fault.service");
+const {
+  detectMaintenanceFrequencyAnomalies
+} = require("../utils/maintenanceAnomalyModel");
 const {
   defaultToolNames,
   getBusMarkerCode,
   getToolMarkerCode,
   getIssueTypeOptionsForPart
 } = require("../utils/arIssueCatalog");
+
 const {
-  buildComponentPresentationFields,
-  buildBusMaintenanceFields,
-  buildBusMaintenanceStatus
-} = require("./fleetPresentation.shared");
+  COMPONENT_INDICATOR_LABELS,
+  COMPONENT_STATUS_LABELS,
+  deriveComponentPresentation,
+  deriveBusMaintenanceSummary,
+  LIFECYCLE_LABELS,
+  normalizeComponentState,
+  normalizeLifecycleState
+} = require("../utils/maintenanceStatus");
 const {
   getRelativeDemoDate,
   shiftDemoDate
@@ -76,10 +86,16 @@ const shiftHistoryEntry = (entry) => ({
 });
 
 const normalizeMockComponent = (component) => {
+  const conditionState = normalizeComponentState({
+    conditionState: component.conditionState || legacyConditionStateMap[component.status] || "good"
+  });
+  const lifecycleState = normalizeLifecycleState({
+    lifecycleState: component.lifecycleState || legacyLifecycleStateMap[component.status] || "within_expected_life"
+  });
   const lastInspected = shiftDemoDate(component.lastService);
-  const presentation = buildComponentPresentationFields({
-    conditionState: component.conditionState || legacyConditionStateMap[component.status] || "good",
-    lifecycleState: component.lifecycleState || legacyLifecycleStateMap[component.status] || "within_expected_life",
+  const presentation = deriveComponentPresentation({
+    conditionState,
+    lifecycleState,
     issues: [],
     lastInspectedAt: lastInspected,
     inspectionIntervalDays: null
@@ -87,7 +103,16 @@ const normalizeMockComponent = (component) => {
 
   return {
     ...component,
-    ...presentation,
+    status: presentation.status,
+    statusState: presentation.statusState,
+    statusNote: presentation.statusNote,
+    conditionState,
+    conditionLabel: COMPONENT_STATUS_LABELS[conditionState] || COMPONENT_INDICATOR_LABELS[conditionState],
+    lifecycleState,
+    lifecycleLabel: LIFECYCLE_LABELS[lifecycleState],
+    maintenanceIndicator: presentation.maintenanceIndicator,
+    activeIssueCount: 0,
+    inProgressIssueCount: 0,
     lastInspected
   };
 };
@@ -123,82 +148,82 @@ const augmentHistoryWithIssues = async (buses) => {
   const faults = await faultService.getAllFaults({});
 
   return Promise.all(
-    buses.map(async (rawBus) => {
-      const bus = shiftBusDates(rawBus);
-      const components = await Promise.all(
-        bus.components.map(async (component) => {
-          const faultHistory = faults
-            .filter((fault) => fault.bus_part_id === component.id)
-            .map((fault) => ({
-              id: `issue:${fault.id}`,
-              date: shiftDemoDate(fault.created_at),
-              createdAt: fault.created_at,
-              type: "issue",
-              description: `Issue logged: ${fault.title}`,
-              technician: mockActorNameMap[fault.created_by] || "System",
-            }));
+      buses.map(async (rawBus) => {
+        const bus = shiftBusDates(rawBus);
+        const components = await Promise.all(
+            bus.components.map(async (component) => {
+              const faultHistory = faults
+                  .filter((fault) => fault.bus_part_id === component.id)
+                  .map((fault) => ({
+                    id: `issue:${fault.id}`,
+                    date: shiftDemoDate(fault.created_at),
+                    createdAt: fault.created_at,
+                    type: "issue",
+                    description: `Issue logged: ${fault.title}`,
+                    technician: mockActorNameMap[fault.created_by] || "System",
+                  }));
 
-          const faultUpdates = (
-            await Promise.all(
-              faults
-                .filter((fault) => fault.bus_part_id === component.id)
-                .map((fault) => faultService.getFaultUpdates(fault.id))
-            )
-          ).flat().filter(Boolean).map((update) => ({
-            id: `update:${update.id}`,
-            date: shiftDemoDate(update.created_at),
-            createdAt: update.created_at,
-            type: update.update_type,
-            description: update.description,
-            technician: mockActorNameMap[update.created_by] || "System",
-          }));
+              const faultUpdates = (
+                  await Promise.all(
+                      faults
+                          .filter((fault) => fault.bus_part_id === component.id)
+                          .map((fault) => faultService.getFaultUpdates(fault.id))
+                  )
+              ).flat().filter(Boolean).map((update) => ({
+                id: `update:${update.id}`,
+                date: shiftDemoDate(update.created_at),
+                createdAt: update.created_at,
+                type: update.update_type,
+                description: update.description,
+                technician: mockActorNameMap[update.created_by] || "System",
+              }));
 
-          return {
-            ...component,
-            ...buildComponentPresentationFields({
-              conditionState: component.conditionState,
-              lifecycleState: component.lifecycleState,
-              issues: faults.filter((fault) => fault.bus_part_id === component.id),
-              lastInspectedAt: component.lastInspected || component.lastService,
-              inspectionIntervalDays: null
-            }),
-            history: [...component.history, ...faultHistory, ...faultUpdates].sort(
-              (left, right) => new Date(right.date).getTime() - new Date(left.date).getTime()
-            ),
-          };
-        })
-      );
+              return {
+                ...component,
+                ...deriveComponentPresentation({
+                  conditionState: component.conditionState,
+                  lifecycleState: component.lifecycleState,
+                  issues: faults.filter((fault) => fault.bus_part_id === component.id),
+                  lastInspectedAt: component.lastInspected || component.lastService,
+                  inspectionIntervalDays: null
+                }),
+                history: [...component.history, ...faultHistory, ...faultUpdates].sort(
+                    (left, right) => new Date(right.date).getTime() - new Date(left.date).getTime()
+                ),
+              };
+            })
+        );
 
-      const maintenanceSummary = buildBusMaintenanceFields({
-        nextServiceAt: bus.nextServiceDate,
-        issues: buildMockIssueSummaryInput({ ...bus, components }),
-        components
-      });
+        const maintenanceSummary = deriveBusMaintenanceSummary({
+          nextServiceAt: bus.nextServiceDate,
+          issues: buildMockIssueSummaryInput({ ...bus, components }),
+          components
+        });
 
-      return {
-        ...bus,
-        status: maintenanceSummary.status,
-        issueIndicator: maintenanceSummary.issueIndicator,
-        componentIndicator: maintenanceSummary.componentIndicator,
-        serviceIndicator: maintenanceSummary.serviceIndicator,
-        components,
-      };
-    })
+        return {
+          ...bus,
+          status: maintenanceSummary.status,
+          issueIndicator: maintenanceSummary.issueIndicator,
+          componentIndicator: maintenanceSummary.componentIndicator,
+          serviceIndicator: maintenanceSummary.serviceIndicator,
+          components,
+        };
+      })
   );
 };
 
 // Helper function to create a bus component
 const createComponent = (
-  id,
-  name,
-  icon,
-  status,
-  lastRepair,
-  lastService,
-  lastReplacement,
-  healthPercent,
-  history,
-  arInstructions
+    id,
+    name,
+    icon,
+    status,
+    lastRepair,
+    lastService,
+    lastReplacement,
+    healthPercent,
+    history,
+    arInstructions
 ) => ({
   id,
   name,
@@ -384,10 +409,10 @@ const applyGeneratedHistoryToBus = (bus, busIndex) => ({
   components: bus.components.map((component, componentIndex) => ({
     ...component,
     history: generateComponentHistoryForBus(
-      bus.id,
-      busIndex,
-      component.id,
-      componentIndex
+        bus.id,
+        busIndex,
+        component.id,
+        componentIndex
     )
   }))
 });
@@ -398,8 +423,8 @@ const adjustComponents = (components, overrides) => {
     const override = overrides[component.id];
 
     return override
-      ? { ...component, ...override, history: [...component.history], arInstructions: [...component.arInstructions] }
-      : { ...component, history: [...component.history], arInstructions: [...component.arInstructions] };
+        ? { ...component, ...override, history: [...component.history], arInstructions: [...component.arInstructions] }
+        : { ...component, history: [...component.history], arInstructions: [...component.arInstructions] };
   });
 };
 
@@ -703,7 +728,7 @@ exports.getARContext = async (id) => {
       plateNumber: bus.plateNumber,
       depotId: `mock-depot-${depotSequence}`,
       depotName,
-      status: buildBusMaintenanceStatus({
+      status: deriveBusMaintenanceSummary({
         nextServiceAt: shiftDemoDate(bus.nextServiceDate),
         issues: buildMockIssueSummaryInput(bus),
         components: bus.components.map((component) => ({
@@ -797,7 +822,7 @@ exports.getARSnapshot = async (id) => {
       plateNumber: bus.plateNumber,
       depotId: `mock-depot-${depotSequence}`,
       depotName,
-      status: buildBusMaintenanceStatus({
+      status: deriveBusMaintenanceSummary({
         nextServiceAt: shiftDemoDate(bus.nextServiceDate),
         issues: buildMockIssueSummaryInput(bus),
         components: bus.components.map((component) => ({
