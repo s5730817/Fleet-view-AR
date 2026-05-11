@@ -69,7 +69,7 @@ export function ToolTrackingView({
 
   const checklistPanel = (
     <div className="space-y-3 text-white">
-      <div className="rounded-2xl border border-white/10 bg-black/72 p-3 backdrop-blur">
+      <div className="rounded-2xl border border-white/10 ar-glass-strong p-3 backdrop-blur">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[11px] uppercase tracking-[0.24em] text-white/55">Tool checklist</p>
@@ -81,7 +81,7 @@ export function ToolTrackingView({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-black/72 p-3 backdrop-blur">
+      <div className="rounded-2xl border border-white/10 ar-glass-strong p-3 backdrop-blur">
         {toolChecklist.length > 0 ? (
           <ul className="max-h-[min(46vh,26rem)] space-y-2 overflow-y-auto pr-1">
             {toolChecklist.map((tool) => (
@@ -122,7 +122,7 @@ export function ToolTrackingView({
       <div ref={arContainerRef} className="fixed inset-0 z-[1000] h-screen w-screen overflow-hidden bg-black" />
 
       <div className="pointer-events-none fixed inset-x-0 top-0 z-[1002] p-4">
-        <div className="pointer-events-auto mx-auto grid w-full max-w-6xl grid-cols-3 items-center gap-2 rounded-2xl border border-white/15 bg-black/82 px-2 py-4 backdrop-blur sm:gap-3 sm:px-4 sm:py-3">
+        <div className="pointer-events-auto mx-auto grid w-full max-w-6xl grid-cols-3 items-center gap-2 rounded-2xl border border-white/15 ar-glass-strong px-2 py-4 backdrop-blur sm:gap-3 sm:px-4 sm:py-3">
           <div className="min-w-0 flex justify-start">
             <button
               type="button"
@@ -168,7 +168,7 @@ export function ToolTrackingView({
             className="pointer-events-none fixed inset-x-0 bottom-0 z-[1004] p-4 md:hidden"
             style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
           >
-            <div className="pointer-events-auto mx-auto max-h-[34vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-white/15 bg-black/88 p-3 shadow-2xl backdrop-blur">
+            <div className="pointer-events-auto mx-auto max-h-[34vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-white/15 ar-glass-strong p-3 shadow-2xl backdrop-blur">
               {checklistPanel}
             </div>
           </div>
@@ -196,13 +196,7 @@ export function ToolTrackingView({
         </div>
       )}
 
-      {!isChecklistOpen && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[1004] flex justify-center px-4 md:hidden">
-          <div className="pointer-events-auto rounded-full border border-white/15 bg-black/75 px-4 py-2 text-xs text-white/80 backdrop-blur">
-            {foundTools.length}/{toolChecklist.length || 0} tools found
-          </div>
-        </div>
-      )}
+  
 
     </div>
   );

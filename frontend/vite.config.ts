@@ -6,7 +6,7 @@ import path from "path";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const useHttps = env.VITE_DEV_HTTPS === "1";
+  const useHttps = mode === "https" || env.VITE_DEV_HTTPS === "1";
 
   const certCandidates = [
     {
