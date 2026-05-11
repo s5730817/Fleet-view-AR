@@ -1318,6 +1318,147 @@ const showcaseBusScenarios = [
         lifecycleState: "within_expected_life"
       }
     }
+  },
+  {
+    seed: "showcase-anomaly-high",
+    registrationNumber: "DMO-110",
+    name: "Anomaly: High Risk Bus",
+    depotSeed: "depot:central",
+    model: "Volvo B9TL Wright Eclipse Gemini",
+    year: 2012,
+    mileage: 368000,
+    lastServiceOffset: -35,
+    nextServiceOffset: -5,
+    partOverrides: {
+      engine: {
+        conditionState: "repair_needed",
+        lifecycleState: "near_end_of_life",
+        history: [
+          {
+            seed: "anomaly-high-engine-r1",
+            type: "repair",
+            technicianEmail: "tech1@test.com",
+            description: "Injector seal replaced after oil seep.",
+            dateOffset: -4
+          },
+          {
+            seed: "anomaly-high-engine-r2",
+            type: "repair",
+            technicianEmail: "tech1@test.com",
+            description: "Timing belt tension adjusted after misfires.",
+            dateOffset: -12
+          },
+          {
+            seed: "anomaly-high-engine-r3",
+            type: "repair",
+            technicianEmail: "tech2@test.com",
+            description: "Coolant hose replaced — hairline crack found.",
+            dateOffset: -23
+          },
+          {
+            seed: "anomaly-high-engine-r4",
+            type: "service",
+            technicianEmail: "tech1@test.com",
+            description: "Emergency service following repeated fault codes.",
+            dateOffset: -28
+          }
+        ]
+      },
+      brakes: {
+        conditionState: "repair_needed",
+        lifecycleState: "beyond_expected_life",
+        history: [
+          {
+            seed: "anomaly-high-brakes-r1",
+            type: "repair",
+            technicianEmail: "tech1@test.com",
+            description: "Rear brake caliper stripped and reseated.",
+            dateOffset: -6
+          },
+          {
+            seed: "anomaly-high-brakes-r2",
+            type: "repair",
+            technicianEmail: "tech2@test.com",
+            description: "Front near-side brake pad replaced.",
+            dateOffset: -19
+          }
+        ]
+      }
+    }
+  },
+  {
+    seed: "showcase-anomaly-medium",
+    registrationNumber: "DMO-111",
+    name: "Anomaly: Medium Alert Bus",
+    depotSeed: "depot:central",
+    model: "Alexander Dennis Enviro 400 MMC",
+    year: 2020,
+    mileage: 98000,
+    lastServiceOffset: -50,
+    nextServiceOffset: 15,
+    partOverrides: {
+      engine: {
+        conditionState: "monitor",
+        lifecycleState: "within_expected_life",
+        history: [
+          {
+            seed: "anomaly-med-engine-r1",
+            type: "repair",
+            technicianEmail: "tech2@test.com",
+            description: "Engine air filter replaced — blockage found.",
+            dateOffset: -7
+          },
+          {
+            seed: "anomaly-med-engine-r2",
+            type: "repair",
+            technicianEmail: "tech2@test.com",
+            description: "Throttle body cleaned — sluggish response.",
+            dateOffset: -21
+          }
+        ]
+      },
+      brakes: {
+        conditionState: "good",
+        lifecycleState: "within_expected_life",
+        history: [
+          {
+            seed: "anomaly-med-brakes-old1",
+            type: "service",
+            technicianEmail: "tech1@test.com",
+            description: "Brake system routine service.",
+            dateOffset: -52
+          },
+          {
+            seed: "anomaly-med-brakes-old2",
+            type: "service",
+            technicianEmail: "tech1@test.com",
+            description: "Brake fluid checked and topped.",
+            dateOffset: -82
+          },
+          {
+            seed: "anomaly-med-brakes-old3",
+            type: "repair",
+            technicianEmail: "tech1@test.com",
+            description: "Front brake pad wear — replaced.",
+            dateOffset: -133
+          },
+          {
+            seed: "anomaly-med-brakes-r1",
+            type: "repair",
+            technicianEmail: "tech2@test.com",
+            description: "Rear brake pad — borderline wear, replaced.",
+            dateOffset: -9
+          },
+          {
+            seed: "anomaly-med-brakes-r2",
+            type: "service",
+            technicianEmail: "tech2@test.com",
+            description: "Brake fluid flush — contamination found.",
+            dateOffset: -24
+          }
+        ]
+      }
+    }
   }
 ];
 

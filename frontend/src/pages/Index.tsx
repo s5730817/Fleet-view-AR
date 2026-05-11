@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { BusCard } from "@/components/BusCard";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getBusById, getFleet } from "@/lib/api";
+import { getBusById, getFleet, getMaintenanceAnomalies } from "@/lib/api";
 import { Bus, Wrench, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 const Index = () => {
@@ -10,6 +10,13 @@ const Index = () => {
   const { data: fleet = [], isLoading, error } = useQuery({
     queryKey: ["fleet"],
     queryFn: getFleet,
+  });
+
+  const { data: anomalies = [] } = useQuery({
+    queryKey: ["maintenance-anomalies"],
+    queryFn: getMaintenanceAnomalies,
+    staleTime: 0,
+    retry: false,
   });
 
   useEffect(() => {
@@ -185,7 +192,7 @@ const Index = () => {
               {depot.buses.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {depot.buses.map((bus) => (
-                    <BusCard key={bus.id} bus={bus} />
+                    <BusCard key={bus.id} bus={bus} anomalies={anomalies} />
                   ))}
                 </div>
               ) : (

@@ -1,15 +1,20 @@
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { BusStatusBadge } from "@/components/StatusBadge";
-import { Bus as BusIcon, Gauge, Calendar, Wrench, ChevronRight } from "lucide-react";
+import { Bus as BusIcon, Gauge, Calendar, Wrench, ChevronRight, AlertTriangle } from "lucide-react";
 import { useSyncStatus } from "@/context/SyncStatusContext";
-import type { Bus } from "@/types/fleet";
+import type { Bus, MaintenanceAnomaly } from "@/types/fleet";
 import { getDaysAgo } from "@/lib/dateUtils";
 
-export function BusCard({ bus }: { bus: Bus }) {
+export function BusCard({ bus, anomalies = [] }: { bus: Bus; anomalies?: MaintenanceAnomaly[] }) {
   const navigate = useNavigate();
   const { getBusOperationState } = useSyncStatus();
   const busQueueState = getBusOperationState(bus.id);
+
+  const busAnomalies = anomalies.filter(
+    (a) => a.busId === bus.id && (a.riskLevel === "medium" || a.riskLevel === "high"),
+  );
+  const topRisk = busAnomalies.some((a) => a.riskLevel === "high") ? "high" : busAnomalies.length > 0 ? "medium" : null;
 
   return (
     <Card
@@ -43,6 +48,20 @@ export function BusCard({ bus }: { bus: Bus }) {
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Status</span>
             <BusStatusBadge status={bus.status} />
           </div>
+          {topRisk && (
+            <div className={`col-span-2 flex items-start gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium ${
+              topRisk === "high"
+                ? "border-status-urgent/30 bg-status-urgent/10 text-status-urgent"
+                : "border-status-service/30 bg-status-service/10 text-status-service"
+            }`}>
+              <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
+              <span>
+                {busAnomalies.length === 1
+                  ? `Anomaly detected: ${busAnomalies[0].componentName}`
+                  : `${busAnomalies.length} anomalies detected — ${busAnomalies.map((a) => a.componentName).join(", ")}`}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="mt-3 rounded-lg border bg-background/60 p-3 space-y-1.5 text-xs text-muted-foreground">

@@ -27,7 +27,7 @@ import {
   applyOptimisticFleetOperations,
 } from "@/lib/offline-optimistic";
 import { maintenanceEntryRequiresManagerApproval } from "@/lib/offline-review";
-import type { ARCatalog, Bus, BusARContext, BusARSnapshot, MaintenanceEntry } from "@/types/fleet";
+import type { ARCatalog, Bus, BusARContext, BusARSnapshot, MaintenanceEntry, MaintenanceAnomaly } from "@/types/fleet";
 
 type MaintenanceEntryWrite = {
   type: "service" | "repair" | "replacement";
@@ -375,6 +375,19 @@ export const getFleet = async (): Promise<Bus[]> => {
   }
 
   return applyOptimisticFleetOperations(fleet, await getPendingOfflineOperations());
+};
+
+export const getMaintenanceAnomalies = async (): Promise<MaintenanceAnomaly[]> => {
+  try {
+    const response = await fetch(`${API_URL}/fleet/maintenance-anomalies`, {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) return [];
+    const result = await response.json() as { data?: MaintenanceAnomaly[] };
+    return Array.isArray(result.data) ? result.data : [];
+  } catch {
+    return [];
+  }
 };
 
 export const getBusById = async (id: string): Promise<Bus> => {

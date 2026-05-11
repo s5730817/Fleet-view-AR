@@ -1,9 +1,9 @@
 const DEFAULT_OPTIONS = {
   recentWindowDays: 30,
   baselineWindowDays: 180,
-  minimumExpectedEvents: 0.25,
+  minimumExpectedEvents: 1.0,
   mediumRiskThreshold: 1.75,
-  highRiskThreshold: 2.75,
+  highRiskThreshold: 2.2,
 };
 
 const PREDICTIVE_EVENT_TYPES = new Set([

@@ -886,3 +886,8 @@ exports.addMaintenanceEntry = async (busId, componentId, body) => {
 
   return newEntry;
 };
+
+exports.getMaintenanceAnomalies = async (_user, options = {}) => {
+  const buses = await exports.getAllBuses();
+  return detectMaintenanceFrequencyAnomalies(buses, options);
+};

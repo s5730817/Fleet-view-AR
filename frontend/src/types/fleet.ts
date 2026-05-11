@@ -126,6 +126,23 @@ export interface Bus {
   components: BusComponent[];
 }
 
+export interface MaintenanceAnomaly {
+  busId: string;
+  busName: string;
+  plateNumber: string;
+  componentId: string;
+  componentName: string;
+  riskLevel: "low" | "medium" | "high";
+  anomalyScore: number;
+  expectedEvents: number;
+  actualEvents: number;
+  recentRepairCount: number;
+  recentServiceCount: number;
+  recentWindowDays: number;
+  baselineWindowDays: number;
+  message: string;
+}
+
 export interface ARGuide {
   title: string;
   recommendedAction: "repair" | "replacement" | string;

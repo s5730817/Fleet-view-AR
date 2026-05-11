@@ -789,3 +789,8 @@ exports.addMaintenanceEntry = async (busId, componentId, body, user) => {
 
   return mapMaintenanceEntry(entry);
 };
+
+exports.getMaintenanceAnomalies = async (user, options = {}) => {
+  const buses = await exports.getAllBuses(user);
+  return detectMaintenanceFrequencyAnomalies(buses, options);
+};
